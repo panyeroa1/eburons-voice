@@ -14,6 +14,8 @@ const Settings: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
 
+  const validTopics = ['Eburon Aegis Vision', 'Eburon Flyer', 'Decobu Messenger'];
+
   // Load initial settings from LocalStorage then try Supabase
   useEffect(() => {
       const localTopic = localStorage.getItem('eburon_topic');
@@ -21,7 +23,15 @@ const Settings: React.FC = () => {
       const localLang = localStorage.getItem('eburon_language');
       const localVoiceName = localStorage.getItem('eburon_voice_name');
 
-      if (localTopic) setTopic(localTopic);
+      // Validate and Load Topic
+      if (localTopic && validTopics.includes(localTopic)) {
+          setTopic(localTopic);
+      } else {
+          // Auto-correction for invalid or legacy topics
+          setTopic('Eburon Aegis Vision');
+          localStorage.setItem('eburon_topic', 'Eburon Aegis Vision');
+      }
+
       if (localVoiceStyle) setVoiceStyle(localVoiceStyle);
       if (localLang) setLanguage(localLang);
       if (localVoiceName) setVoiceName(localVoiceName);
@@ -41,8 +51,13 @@ const Settings: React.FC = () => {
           
           if (data && !error) {
               if (data.topic) {
-                  setTopic(data.topic);
-                  localStorage.setItem('eburon_topic', data.topic);
+                  if (validTopics.includes(data.topic)) {
+                      setTopic(data.topic);
+                      localStorage.setItem('eburon_topic', data.topic);
+                  } else {
+                      setTopic('Eburon Aegis Vision');
+                      localStorage.setItem('eburon_topic', 'Eburon Aegis Vision');
+                  }
               }
               if (data.voice_style) {
                   setVoiceStyle(data.voice_style);

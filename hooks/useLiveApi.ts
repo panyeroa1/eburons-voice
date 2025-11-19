@@ -132,15 +132,20 @@ export const useLiveApi = () => {
       // Prepare System Instruction with Topic and Voice Config
       let systemInstruction = ORUS_SYSTEM_PROMPT;
       
-      // 1. Inject Knowledge Topic
+      // 1. Inject Knowledge Topic (With Robust Fallback)
       const selectedTopic = localStorage.getItem('eburon_topic') || 'Eburon Aegis Vision';
+      let topicContent = AEGIS_VISION_CONTENT; // Default Fallback
+
       if (selectedTopic === 'Decobu Messenger') {
-          systemInstruction += "\n\n" + "CURRENT TOPIC BRIEFING:\n" + DECOBU_SECURITY_CONTENT;
+          topicContent = DECOBU_SECURITY_CONTENT;
       } else if (selectedTopic === 'Eburon Flyer') {
-          systemInstruction += "\n\n" + "CURRENT TOPIC BRIEFING:\n" + EBURON_FLYER_CONTENT;
+          topicContent = EBURON_FLYER_CONTENT;
       } else if (selectedTopic === 'Eburon Aegis Vision') {
-          systemInstruction += "\n\n" + "CURRENT TOPIC BRIEFING:\n" + AEGIS_VISION_CONTENT;
+          topicContent = AEGIS_VISION_CONTENT;
       }
+      // If topic is unknown (e.g. deprecated "Trafficking..."), it stays as AEGIS_VISION_CONTENT
+
+      systemInstruction += "\n\n" + "CURRENT TOPIC BRIEFING:\n" + topicContent;
 
       // 2. Inject Voice Style and Language
       const voiceStyle = localStorage.getItem('eburon_voice_style') || 'Dutch Flemish expressive';
@@ -148,8 +153,15 @@ export const useLiveApi = () => {
       
       // 3. Resolve Voice Name
       const selectedVoiceName = localStorage.getItem('eburon_voice_name') || 'Orus';
-      // Map "Orus" (Custom Persona) to "Kore" (Valid API Voice)
-      const apiVoiceName = selectedVoiceName === 'Orus' ? 'Kore' : selectedVoiceName;
+      
+      // Map "Orus" to "Fenrir" (Authority/Deep) instead of "Kore" to fit the Eburon Persona better
+      let apiVoiceName = 'Fenrir'; 
+      
+      if (selectedVoiceName === 'Orus') {
+          apiVoiceName = 'Fenrir'; 
+      } else if (['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr', 'Aoede'].includes(selectedVoiceName)) {
+          apiVoiceName = selectedVoiceName;
+      }
 
       // Dynamic Expression Injection: Precisely map settings to expression constants
       let expressionContent = "";
