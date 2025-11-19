@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { 
@@ -42,6 +43,7 @@ export const useLiveApi = () => {
   const nextStartTimeRef = useRef<number>(0);
   const sessionRef = useRef<any>(null);
   const [transcription, setTranscription] = useState<string>('');
+  const volumeGainNodeRef = useRef<GainNode | null>(null);
   
   // Sync Refs for Audio Loop
   const isSpeakingRef = useRef(false);
@@ -55,6 +57,52 @@ export const useLiveApi = () => {
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const connectRef = useRef<(() => Promise<void>) | null>(null);
   const MAX_RETRIES = 3;
+
+  // Helper: Cleanup Audio Nodes
+  const cleanupAudioNodes = useCallback(() => {
+      if (sourceRef.current) {
+          try { sourceRef.current.disconnect(); } catch(e) {}
+          sourceRef.current = null;
+      }
+      if (processorRef.current) {
+          try { processorRef.current.disconnect(); } catch(e) {}
+          processorRef.current = null;
+      }
+      if (streamRef.current) {
+          streamRef.current.getTracks().forEach(t => t.stop());
+          streamRef.current = null;
+      }
+      // Do not close contexts, just suspend/cleanup nodes
+  }, []);
+
+  // Helper: Attempt Reconnect
+  const attemptReconnect = useCallback(() => {
+      if (reconnectAttemptRef.current < MAX_RETRIES) {
+          reconnectAttemptRef.current += 1;
+          const delay = Math.min(1000 * (2 ** (reconnectAttemptRef.current - 1)), 5000);
+          
+          console.log(`Attempting reconnect ${reconnectAttemptRef.current}/${MAX_RETRIES} in ${delay}ms`);
+          
+          setStatus(s => ({ 
+              ...s, 
+              isReconnecting: true, 
+              error: `Connection lost. Retrying (${reconnectAttemptRef.current}/${MAX_RETRIES})...` 
+          }));
+          
+          if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+          
+          retryTimeoutRef.current = setTimeout(() => {
+              if (connectRef.current) connectRef.current();
+          }, delay);
+      } else {
+          setStatus(s => ({ 
+              ...s, 
+              isReconnecting: false, 
+              error: "Connection failed. Check network or API key." 
+          }));
+          reconnectAttemptRef.current = 0;
+      }
+  }, []);
 
   const connect = useCallback(async () => {
     // Prevent double connection
@@ -98,10 +146,17 @@ export const useLiveApi = () => {
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.1;
       outputAnalyserRef.current = analyser;
+      
+      // Setup Volume Gain Node for Ducking
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.value = 1.0;
+      volumeGainNodeRef.current = gainNode;
 
       // Start Visualizer Loop
       const updateVisualizer = () => {
         let vol = 0;
+        
+        // Note: Audio Ducking Logic moved to onaudioprocess for background robustness
         
         if (isSpeakingRef.current && outputAnalyserRef.current) {
             // Agent is speaking: Use Output Analyser
@@ -126,8 +181,14 @@ export const useLiveApi = () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(updateVisualizer);
 
-      // Get Mic Stream
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Get Mic Stream with Echo Cancellation
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+          } 
+      });
       streamRef.current = stream;
 
       // Build System Instruction
@@ -149,6 +210,7 @@ export const useLiveApi = () => {
       const voiceStyle = localStorage.getItem('eburon_voice_style') || 'Dutch Flemish expressive';
       const language = localStorage.getItem('eburon_language') || 'English';
       const selectedVoiceName = localStorage.getItem('eburon_voice_name') || 'Orus';
+      const speechRate = localStorage.getItem('eburon_speech_rate') || 'normal';
       
       let apiVoiceName = 'Fenrir'; 
       if (selectedVoiceName === 'Orus') {
@@ -158,7 +220,6 @@ export const useLiveApi = () => {
       }
 
       let expressionContent = "";
-      // ... [Expression logic remains same, condensed for brevity] ...
       if (voiceStyle.includes('Flemish') || voiceStyle.includes('Dutch')) expressionContent = FLEMISH_EXPRESSIONS_CONTENT;
       else if (voiceStyle.includes('Tagalog')) expressionContent = TAGALOG_EXPRESSIONS_CONTENT;
       else if (voiceStyle.includes('Singapore') || voiceStyle.includes('Singlish')) expressionContent = SINGAPORE_EXPRESSIONS_CONTENT;
@@ -180,9 +241,24 @@ export const useLiveApi = () => {
       1. VOICE STYLE/ACCENT: You must strictly adopt a "${voiceStyle}" accent, tone, and persona. 
          - Even if speaking English, you must sound like a native speaker of that region speaking English.
          - You MUST use the provided cultural expressions/fillers from the NUANCE GUIDE naturally within your sentences.
+         - **BREATHY DELIVERY:** Maintain a soft, breathy, naturally imperfect delivery throughout.
+         - **ADDRESSING:** Use native address terms (e.g. "My friend", "Yaar", "Mone", "Habeebi") suited to the selected culture.
       2. OUTPUT LANGUAGE: You must speak in "${language}".
+      `;
+
+      // Dynamic Speech Rate Instruction
+      let rateInstruction = "";
+      if (speechRate === 'slow') {
+        rateInstruction = "\n*** SPEECH RATE PROTOCOL: SLOW ***\n- Speak at a deliberate, measured pace.\n- Articulate every word clearly.\n- Pause slightly longer between sentences to allow the listener to process information.";
+      } else if (speechRate === 'fast') {
+        rateInstruction = "\n*** SPEECH RATE PROTOCOL: FAST ***\n- Speak at a brisk, energetic pace.\n- Minimize pauses between sentences.\n- Deliver information efficiently and rapidly.";
+      } else if (speechRate === 'super_fast') {
+        rateInstruction = "\n*** SPEECH RATE PROTOCOL: SUPER FAST ***\n- Speak very rapidly.\n- Prioritize high information density over pauses.\n- Maintain clarity but maximize speed.";
+      }
       
-      *** FINAL AUDIO TAG ENFORCEMENT ***
+      if (rateInstruction) systemInstruction += rateInstruction;
+
+      systemInstruction += `\n\n*** FINAL AUDIO TAG ENFORCEMENT ***
       - DO NOT SPEAK BRACKETED TEXT.
       - [sigh] = Sound of sighing. NOT the word "sigh".
       `;
@@ -234,6 +310,18 @@ export const useLiveApi = () => {
               const rms = Math.sqrt(sum / inputData.length);
               micVolumeRef.current = rms * 3; 
 
+              // Ducking Logic (Background Safe):
+              // Applied here to ensure it runs even if UI/RAF is throttled in background tabs.
+              if (volumeGainNodeRef.current && audioContextRef.current) {
+                  const targetGain = micVolumeRef.current > 0.1 ? 0.2 : 1.0;
+                  // Use AudioParam automation for smooth, thread-safe transitions
+                  volumeGainNodeRef.current.gain.setTargetAtTime(
+                      targetGain, 
+                      audioContextRef.current.currentTime, 
+                      0.1 // Time constant for smoothing
+                  );
+              }
+
               // Downsample if necessary (Browser rarely honors 16000Hz requests perfectly)
               const processedData = downsampleBuffer(inputData, actualSampleRate, 16000);
 
@@ -266,7 +354,7 @@ export const useLiveApi = () => {
 
             if (msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data) {
               const audioData = msg.serverContent.modelTurn.parts[0].inlineData.data;
-              if (audioContextRef.current) {
+              if (audioContextRef.current && volumeGainNodeRef.current) {
                 setStatus(s => ({...s, isSpeaking: true}));
                 isSpeakingRef.current = true;
                 
@@ -279,11 +367,14 @@ export const useLiveApi = () => {
                 const source = ctx.createBufferSource();
                 source.buffer = audioBuffer;
                 
+                // Connect through the Gain Node (for ducking) before destination
+                source.connect(volumeGainNodeRef.current);
+                
                 if (outputAnalyserRef.current) {
-                    source.connect(outputAnalyserRef.current);
+                    volumeGainNodeRef.current.connect(outputAnalyserRef.current);
                     outputAnalyserRef.current.connect(ctx.destination);
                 } else {
-                    source.connect(ctx.destination);
+                    volumeGainNodeRef.current.connect(ctx.destination);
                 }
                 
                 const currentTime = ctx.currentTime;
@@ -366,56 +457,12 @@ export const useLiveApi = () => {
           attemptReconnect();
       }
     }
-  }, []);
+  }, [attemptReconnect, cleanupAudioNodes]);
 
-  // Helper to allow recursive calls
+  // Sync connect function to ref for retry logic
   useEffect(() => {
       connectRef.current = connect;
   }, [connect]);
-
-  const cleanupAudioNodes = () => {
-      if (sourceRef.current) {
-          try { sourceRef.current.disconnect(); } catch(e) {}
-          sourceRef.current = null;
-      }
-      if (processorRef.current) {
-          try { processorRef.current.disconnect(); } catch(e) {}
-          processorRef.current = null;
-      }
-      if (streamRef.current) {
-          streamRef.current.getTracks().forEach(t => t.stop());
-          streamRef.current = null;
-      }
-      // Do not close contexts, just suspend/cleanup nodes
-  };
-
-  const attemptReconnect = () => {
-      if (reconnectAttemptRef.current < MAX_RETRIES) {
-          reconnectAttemptRef.current += 1;
-          const delay = Math.min(1000 * (2 ** (reconnectAttemptRef.current - 1)), 5000);
-          
-          console.log(`Attempting reconnect ${reconnectAttemptRef.current}/${MAX_RETRIES} in ${delay}ms`);
-          
-          setStatus(s => ({ 
-              ...s, 
-              isReconnecting: true, 
-              error: `Connection lost. Retrying (${reconnectAttemptRef.current}/${MAX_RETRIES})...` 
-          }));
-          
-          if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
-          
-          retryTimeoutRef.current = setTimeout(() => {
-              if (connectRef.current) connectRef.current();
-          }, delay);
-      } else {
-          setStatus(s => ({ 
-              ...s, 
-              isReconnecting: false, 
-              error: "Connection failed. Check network or API key." 
-          }));
-          reconnectAttemptRef.current = 0;
-      }
-  };
 
   const disconnect = useCallback(() => {
     isIntentionalDisconnectRef.current = true;
@@ -450,7 +497,7 @@ export const useLiveApi = () => {
       volume: 0
     });
     setTranscription('');
-  }, []);
+  }, [cleanupAudioNodes]);
 
   const sendText = useCallback((text: string) => {
       if (sessionRef.current) {

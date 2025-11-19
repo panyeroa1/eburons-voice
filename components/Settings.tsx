@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, ChevronDown, FileText, CheckCircle, Mic, Globe, Save, Cloud, AlertCircle, Loader2, Volume2 } from 'lucide-react';
+import { Settings as SettingsIcon, ChevronDown, FileText, CheckCircle, Mic, Globe, Save, Cloud, AlertCircle, Loader2, Volume2, Gauge } from 'lucide-react';
 import { supabase, getSessionId } from '../utils/supabaseClient';
 
 const Settings: React.FC = () => {
@@ -9,6 +9,7 @@ const Settings: React.FC = () => {
   const [voiceStyle, setVoiceStyle] = useState<string>('Dutch Flemish expressive');
   const [language, setLanguage] = useState<string>('English');
   const [voiceName, setVoiceName] = useState<string>('Orus');
+  const [speechRate, setSpeechRate] = useState<string>('normal');
 
   const [isSaved, setIsSaved] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -22,6 +23,7 @@ const Settings: React.FC = () => {
       const localVoiceStyle = localStorage.getItem('eburon_voice_style');
       const localLang = localStorage.getItem('eburon_language');
       const localVoiceName = localStorage.getItem('eburon_voice_name');
+      const localSpeechRate = localStorage.getItem('eburon_speech_rate');
 
       // Validate and Load Topic
       if (localTopic && validTopics.includes(localTopic)) {
@@ -35,6 +37,7 @@ const Settings: React.FC = () => {
       if (localVoiceStyle) setVoiceStyle(localVoiceStyle);
       if (localLang) setLanguage(localLang);
       if (localVoiceName) setVoiceName(localVoiceName);
+      if (localSpeechRate) setSpeechRate(localSpeechRate);
 
       fetchSettingsFromSupabase();
   }, []);
@@ -68,7 +71,7 @@ const Settings: React.FC = () => {
                   setLanguage(data.language);
                   localStorage.setItem('eburon_language', data.language);
               }
-              // Note: voice_name is currently local-only to avoid schema migrations
+              // Note: voice_name and speech_rate are currently local-only to avoid schema migrations
               window.dispatchEvent(new Event('eburon_config_updated'));
           }
       } catch (err) {
@@ -87,6 +90,7 @@ const Settings: React.FC = () => {
       localStorage.setItem('eburon_voice_style', voiceStyle);
       localStorage.setItem('eburon_language', language);
       localStorage.setItem('eburon_voice_name', voiceName);
+      localStorage.setItem('eburon_speech_rate', speechRate);
       
       // Dispatch event to notify LiveAgent
       window.dispatchEvent(new Event('eburon_config_updated'));
@@ -94,7 +98,7 @@ const Settings: React.FC = () => {
       // 2. Save to Supabase
       const sessionId = getSessionId();
       try {
-          // We omit voice_name from Supabase upsert to prevent errors if column doesn't exist
+          // We omit voice_name and speech_rate from Supabase upsert to prevent errors if column doesn't exist
           const { error } = await supabase
               .from('settings')
               .upsert({ 
@@ -143,7 +147,23 @@ const Settings: React.FC = () => {
     "Russian Direct Tech"
   ];
 
-  const voices = ["Orus", "Puck", "Charon", "Kore", "Fenrir", "Aoede", "Zephyr"];
+  // Map internal voice IDs to Star Aliases for UI display
+  const voiceOptions = [
+    { id: "Orus", label: "Sirius (System Default)" },
+    { id: "Puck", label: "Vega" },
+    { id: "Charon", label: "Antares" },
+    { id: "Kore", label: "Capella" },
+    { id: "Fenrir", label: "Rigel" },
+    { id: "Aoede", label: "Spica" },
+    { id: "Zephyr", label: "Altair" }
+  ];
+
+  const rateOptions = [
+    { id: "slow", label: "Slower (Detailed & Deliberate)" },
+    { id: "normal", label: "Normal (Natural Conversation)" },
+    { id: "fast", label: "Fast (Efficient)" },
+    { id: "super_fast", label: "Super Fast (High Bandwidth)" }
+  ];
 
   const languages = [
     "Afrikaans", "Albanian", "Amharic", "Arabic", "Armenian", "Assamese", "Aymara", "Azerbaijani", 
@@ -245,10 +265,10 @@ const Settings: React.FC = () => {
             <div className="flex items-center justify-between">
                 <label className="text-sm text-zinc-400 font-medium uppercase tracking-wider flex items-center gap-2">
                   <Volume2 className="w-4 h-4" />
-                  Base Voice Model
+                  Base Voice Model (Star Alias)
                 </label>
                 <span className="text-[10px] bg-zinc-800 text-zinc-400 px-2 py-1 rounded border border-zinc-700">
-                    DEFAULT: ORUS
+                    SYSTEM
                 </span>
             </div>
             
@@ -258,15 +278,15 @@ const Settings: React.FC = () => {
                 onChange={(e) => setVoiceName(e.target.value)}
                 className="w-full bg-black/50 border border-zinc-700 rounded-lg p-4 appearance-none focus:border-amber-500 outline-none text-white font-mono text-sm transition-colors cursor-pointer group-hover:border-zinc-600"
               >
-                {voices.map(voice => (
-                    <option key={voice} value={voice}>{voice} {voice === 'Orus' ? '(System Default)' : ''}</option>
+                {voiceOptions.map(voice => (
+                    <option key={voice.id} value={voice.id}>{voice.label}</option>
                 ))}
               </select>
               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none" />
             </div>
           </div>
 
-          {/* Voice Style */}
+           {/* Voice Style */}
           <div className="bg-zinc-900/80 backdrop-blur-sm rounded-xl border border-zinc-800 p-6 space-y-4 shadow-lg">
             <div className="flex items-center justify-between">
                 <label className="text-sm text-zinc-400 font-medium uppercase tracking-wider flex items-center gap-2">
@@ -283,6 +303,36 @@ const Settings: React.FC = () => {
               >
                 {voiceStyles.map(style => (
                     <option key={style} value={style}>{style}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Speech Rate */}
+          <div className="bg-zinc-900/80 backdrop-blur-sm rounded-xl border border-zinc-800 p-6 space-y-4 shadow-lg">
+            <div className="flex items-center justify-between">
+                <label className="text-sm text-zinc-400 font-medium uppercase tracking-wider flex items-center gap-2">
+                  <Gauge className="w-4 h-4" />
+                  Speech Pace / Cadence
+                </label>
+                <span className={`text-[10px] px-2 py-1 rounded border ${
+                    speechRate === 'slow' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                    speechRate === 'super_fast' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                    'bg-zinc-800 text-zinc-400 border-zinc-700'
+                }`}>
+                    {speechRate.toUpperCase()}
+                </span>
+            </div>
+            
+            <div className="relative group">
+              <select 
+                value={speechRate}
+                onChange={(e) => setSpeechRate(e.target.value)}
+                className="w-full bg-black/50 border border-zinc-700 rounded-lg p-4 appearance-none focus:border-amber-500 outline-none text-white font-mono text-sm transition-colors cursor-pointer group-hover:border-zinc-600"
+              >
+                {rateOptions.map(option => (
+                    <option key={option.id} value={option.id}>{option.label}</option>
                 ))}
               </select>
               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none" />

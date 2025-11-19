@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import LiveAgent from './components/LiveAgent';
 import ChatInterface from './components/ChatInterface';
@@ -17,20 +18,19 @@ const App: React.FC = () => {
         {/* 
             PERSISTENCE LAYER:
             LiveAgent remains mounted to keep the connection/audio session alive.
-            We use CSS opacity and pointer-events to hide it without unmounting,
-            ensuring the explanation continues in the background during navigation.
+            We explicitly pass the mode so LiveAgent can switch to a Mini Player view
+            when navigating away, ensuring the user has control (Stop Button) and
+            visual confirmation (Visualizer) on any screen.
         */}
-        <div 
-            className={`absolute inset-0 w-full h-full transition-opacity duration-300 ${mode === AppMode.LIVE_AGENT ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'}`}
-            aria-hidden={mode !== AppMode.LIVE_AGENT}
-        >
-             <LiveAgent />
+        <div className="absolute inset-0 w-full h-full z-30 pointer-events-none">
+             <LiveAgent mode={mode} />
         </div>
 
         {/* 
             OVERLAY LAYERS:
-            These components are mounted on demand (or could be persistent) and overlay the agent.
-            We give them a solid background to cover the agent layer when active.
+            These components are mounted on demand and sit "under" the Mini Player 
+            but "over" the LiveAgent Full Screen view (controlled by LiveAgent's internal logic).
+            We use z-20 to ensure they are below the persistent Mini Player (z-50 inside LiveAgent).
         */}
         {mode === AppMode.CHAT && (
             <div className="absolute inset-0 z-20 bg-black">

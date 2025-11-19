@@ -1,9 +1,15 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useLiveApi } from '../hooks/useLiveApi';
 import AudioVisualizer from './AudioVisualizer';
 import { Mic, PhoneOff, Radio, Loader2, RefreshCw, Settings2, HelpCircle } from 'lucide-react';
+import { AppMode } from '../types';
 
-const LiveAgent: React.FC = () => {
+interface LiveAgentProps {
+  mode?: AppMode;
+}
+
+const LiveAgent: React.FC<LiveAgentProps> = ({ mode = AppMode.LIVE_AGENT }) => {
   const { connect, disconnect, sendText, status, transcription } = useLiveApi();
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const disconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -164,8 +170,41 @@ const LiveAgent: React.FC = () => {
       sendText("[SYSTEM INTERRUPT] USER QUESTION PROTOCOL:\n1. Stop your presentation immediately.\n2. Acknowledge the user's question first (e.g. \"That is a valid point regarding...\").\n3. Answer the question in real-time, but STRICTLY within the scope of the current topic. DO NOT invent information. Elaborate on known facts only.\n4. If the question is unclear, ask for clarification.\n5. Ready to listen.");
   };
 
+  // --- MINI PLAYER MODE (Background) ---
+  // If user is navigating other pages (mode !== LIVE_AGENT), show a floating status bar if connected.
+  if (mode !== AppMode.LIVE_AGENT) {
+    if (!status.isConnected) return null; // Hidden completely if not connected
+    
+    return (
+        <div className="fixed top-6 left-0 right-0 z-50 flex justify-center pointer-events-none">
+           <div className="bg-zinc-900/90 border border-amber-500/30 rounded-full px-6 py-2 flex items-center gap-4 shadow-2xl pointer-events-auto backdrop-blur-md animate-in fade-in slide-in-from-top-4">
+              <div className="flex items-center gap-2">
+                 <span className="relative flex h-3 w-3">
+                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                   <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                 </span>
+                 <span className="text-[10px] font-mono font-bold text-amber-500 tracking-widest">LIVE</span>
+              </div>
+              
+              {/* Mini Visualizer */}
+              <div className="w-12 h-3 flex items-center justify-center gap-0.5">
+                  {[1,2,3,4,5].map(i => (
+                      <div key={i} className="w-1 bg-amber-500 rounded-full transition-all duration-75" 
+                           style={{ height: `${Math.max(20, Math.min(100, status.volume * 200 * Math.random()))}%`, opacity: 0.8 }} />
+                  ))}
+              </div>
+    
+              <button onClick={disconnect} className="ml-2 bg-red-900/50 hover:bg-red-900 text-red-200 p-1.5 rounded-full transition-colors" title="End Session">
+                  <PhoneOff className="w-3 h-3" />
+              </button>
+           </div>
+        </div>
+    );
+  }
+
+  // --- FULL SCREEN MODE ---
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-zinc-900 to-black text-white relative overflow-hidden">
+    <div className="flex flex-col h-full bg-gradient-to-b from-zinc-900 to-black text-white relative overflow-hidden pointer-events-auto">
       {/* Header */}
       <div className="p-6 flex justify-between items-center z-10">
         <div>
