@@ -1,10 +1,12 @@
 
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { 
     ORUS_SYSTEM_PROMPT, 
     DECOBU_SECURITY_CONTENT, 
     TRAFFICKING_SYSTEM_CONTENT, 
+    EBURON_FLYER_CONTENT,
     FLEMISH_EXPRESSIONS_CONTENT,
     TAGALOG_EXPRESSIONS_CONTENT,
     SINGAPORE_EXPRESSIONS_CONTENT,
@@ -136,42 +138,44 @@ export const useLiveApi = () => {
           systemInstruction += "\n\n" + "CURRENT TOPIC BRIEFING:\n" + DECOBU_SECURITY_CONTENT;
       } else if (selectedTopic === 'Trafficking Early Warning System') {
           systemInstruction += "\n\n" + "CURRENT TOPIC BRIEFING:\n" + TRAFFICKING_SYSTEM_CONTENT;
+      } else if (selectedTopic === 'Eburon Flyer') {
+          systemInstruction += "\n\n" + "CURRENT TOPIC BRIEFING:\n" + EBURON_FLYER_CONTENT;
       }
 
       // 2. Inject Voice Style and Language
       const voiceStyle = localStorage.getItem('eburon_voice_style') || 'Dutch Flemish expressive';
       const language = localStorage.getItem('eburon_language') || 'English';
 
-      // Dynamic Expression Injection
+      // Dynamic Expression Injection: Precisely map settings to expression constants
       let expressionContent = "";
       
-      if (voiceStyle.includes('Flemish') || voiceStyle.includes('Dutch') || language.includes('Dutch')) {
+      if (voiceStyle.includes('Flemish') || voiceStyle.includes('Dutch')) {
           expressionContent = FLEMISH_EXPRESSIONS_CONTENT;
-      } else if (voiceStyle.includes('Tagalog') || language.includes('Filipino') || language.includes('Tagalog')) {
+      } else if (voiceStyle.includes('Tagalog')) {
           expressionContent = TAGALOG_EXPRESSIONS_CONTENT;
       } else if (voiceStyle.includes('Singapore') || voiceStyle.includes('Singlish')) {
           expressionContent = SINGAPORE_EXPRESSIONS_CONTENT;
-      } else if (voiceStyle.includes('Turkish') || language.includes('Turkish')) {
+      } else if (voiceStyle.includes('Turkish')) {
           expressionContent = TURKISH_EXPRESSIONS_CONTENT;
-      } else if (voiceStyle.includes('Arabic') || language.includes('Arabic')) {
+      } else if (voiceStyle.includes('Arabic') || voiceStyle.includes('UAE')) {
           expressionContent = ARABIC_EXPRESSIONS_CONTENT;
-      } else if (voiceStyle.includes('French') || language.includes('French')) {
+      } else if (voiceStyle.includes('French')) {
           expressionContent = FRENCH_EXPRESSIONS_CONTENT;
-      } else if (voiceStyle.includes('Malayalam') || language.includes('Malayalam')) {
+      } else if (voiceStyle.includes('Malayalam')) {
           expressionContent = MALAYALAM_EXPRESSIONS_CONTENT;
-      } else if (voiceStyle.includes('Spanish') || language.includes('Spanish')) {
+      } else if (voiceStyle.includes('Spanish') || voiceStyle.includes('Mexican')) {
           expressionContent = SPANISH_EXPRESSIONS_CONTENT;
-      } else if (voiceStyle.includes('German') || language.includes('German')) {
+      } else if (voiceStyle.includes('German')) {
           expressionContent = GERMAN_EXPRESSIONS_CONTENT;
-      } else if (voiceStyle.includes('Hindi') || language.includes('Hindi')) {
+      } else if (voiceStyle.includes('Hindi')) {
           expressionContent = HINDI_EXPRESSIONS_CONTENT;
-      } else if (voiceStyle.includes('Japanese') || language.includes('Japanese')) {
+      } else if (voiceStyle.includes('Japanese')) {
           expressionContent = JAPANESE_EXPRESSIONS_CONTENT;
-      } else if (voiceStyle.includes('Korean') || language.includes('Korean')) {
+      } else if (voiceStyle.includes('Korean')) {
           expressionContent = KOREAN_EXPRESSIONS_CONTENT;
-      } else if (voiceStyle.includes('Italian') || language.includes('Italian')) {
+      } else if (voiceStyle.includes('Italian')) {
           expressionContent = ITALIAN_EXPRESSIONS_CONTENT;
-      } else if (voiceStyle.includes('Russian') || language.includes('Russian')) {
+      } else if (voiceStyle.includes('Russian')) {
           expressionContent = RUSSIAN_EXPRESSIONS_CONTENT;
       }
 
@@ -182,10 +186,10 @@ export const useLiveApi = () => {
       systemInstruction += `\n\n*** VOICE IDENTITY & LANGUAGE PROTOCOL (CRITICAL) ***
       1. VOICE STYLE/ACCENT: You must strictly adopt a "${voiceStyle}" accent, tone, and persona. 
          - Even if speaking English, you must sound like a native speaker of that region speaking English.
-         - Use culturally relevant mannerisms or interjections if they fit the style (e.g., "Allee" for Flemish, "Lah" for Taglish/Singlish, "Yani" for Arabic) but keep them subtle.
+         - You MUST use the provided cultural expressions/fillers (e.g., "Allee", "Lah", "Yani", "Aiyo") naturally within your sentences, regardless of the language.
       2. OUTPUT LANGUAGE: You must speak in "${language}".
-         - Example: If Style is "Dutch Flemish" and Language is "English", speak English with a heavy Flemish accent.
-         - Example: If Style is "Turkish" and Language is "Turkish", speak natural Turkish.
+         - Example: If Style is "Dutch Flemish" and Language is "English", speak English with a heavy Flemish accent and use Flemish fillers.
+         - Example: If Style is "Singaporean" and Language is "English", speak Singlish.
       
       CURRENT CONFIGURATION:
       - Style: ${voiceStyle}
@@ -198,9 +202,9 @@ export const useLiveApi = () => {
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Orus' } },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
           },
-          systemInstruction: { parts: [{ text: systemInstruction }] },
+          systemInstruction: systemInstruction,
           inputAudioTranscription: {},
         },
         callbacks: {

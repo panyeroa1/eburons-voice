@@ -107,7 +107,7 @@ const Settings: React.FC = () => {
           setSyncError(`Saved locally. Cloud sync error: ${errorMsg.substring(0, 50)}...`);
           // Still show saved state because local worked
           setIsSaved(true);
-          setTimeout(() => setIsSaved(false), 3000);
+          setTimeout(() => setIsSaved(false), 4000);
       } finally {
           setIsSyncing(false);
       }
@@ -193,8 +193,8 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 p-6 overflow-y-auto z-10">
+      {/* Scrollable Content with bottom padding to avoid footer overlap */}
+      <div className="flex-1 p-6 overflow-y-auto z-10 pb-48">
         <div className="max-w-3xl mx-auto space-y-6">
           
           {/* Topic Selector */}
@@ -217,6 +217,7 @@ const Settings: React.FC = () => {
               >
                 <option value="Trafficking Early Warning System">Trafficking Early Warning System</option>
                 <option value="Decobu Messenger">Decobu Messenger Security</option>
+                <option value="Eburon Flyer">Eburon Flyer Project</option>
                 <option value="Eburon Architecture" disabled>Eburon Architecture (Coming Soon)</option>
                 <option value="Voice Synthesis" disabled>Voice Synthesis Protocols (Coming Soon)</option>
               </select>
@@ -273,34 +274,42 @@ const Settings: React.FC = () => {
                 <span className="text-amber-600">Note:</span> If Language differs from Voice Style, the agent will speak this language with the selected accent.
             </p>
           </div>
+        </div>
+      </div>
 
-          {/* Save Action Area */}
-          <div className="pt-6 flex flex-col items-center gap-4 border-t border-zinc-800/50 mt-8">
+      {/* Sticky Footer - Always Visible */}
+      <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-zinc-950 to-transparent z-20 flex flex-col items-center justify-end pb-6">
+         <div className="w-full max-w-md flex flex-col items-center gap-4 relative">
+            
+            {/* Floating Notifications (Toasts) */}
+            <div className="absolute bottom-20 w-full flex flex-col items-center gap-2 pointer-events-none">
+                 {/* Success Toast */}
+                 <div className={`transform transition-all duration-500 ease-out ${isSaved && !syncError ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
+                     <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-4 py-2 rounded-full backdrop-blur-xl shadow-2xl shadow-emerald-900/20">
+                         <CheckCircle className="w-4 h-4" />
+                         <span className="text-sm font-bold tracking-wide">CONFIG SAVED & SYNCED</span>
+                     </div>
+                 </div>
+
+                 {/* Error Toast */}
+                 <div className={`transform transition-all duration-500 ease-out ${syncError ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>
+                    <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-400 px-4 py-2 rounded-full backdrop-blur-xl shadow-2xl max-w-xs">
+                         <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                         <span className="text-xs font-mono truncate">{syncError}</span>
+                    </div>
+                 </div>
+            </div>
+
+            {/* Main Save Button */}
             <button 
                 onClick={handleSave}
                 disabled={isSyncing}
-                className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-8 py-3 rounded-lg font-medium transition-all shadow-lg hover:shadow-amber-500/20 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full bg-white text-black hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed py-4 rounded-xl font-bold tracking-widest flex items-center justify-center gap-3 shadow-xl hover:shadow-2xl hover:shadow-white/10 active:scale-95 transition-all duration-200 border border-zinc-400/20"
             >
-                {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                {isSyncing ? 'Syncing...' : 'Save Configuration'}
+                {isSyncing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                {isSyncing ? 'SYNCING DATABASE...' : 'SAVE CONFIGURATION'}
             </button>
-
-            {syncError && (
-                <div className="flex items-center gap-2 text-amber-400 bg-amber-900/20 px-4 py-2 rounded-full border border-amber-900/50 animate-in fade-in">
-                    <AlertCircle className="w-4 h-4" />
-                    <span className="text-sm font-medium">{syncError}</span>
-                </div>
-            )}
-
-            {isSaved && !syncError && (
-                <div className="flex items-center gap-2 text-green-400 bg-green-900/20 px-4 py-2 rounded-full border border-green-900/50 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                    <CheckCircle className="w-4 h-4" />
-                    <span className="text-sm font-medium">System configuration saved & synced.</span>
-                </div>
-            )}
-          </div>
-
-        </div>
+         </div>
       </div>
     </div>
   );

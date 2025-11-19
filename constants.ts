@@ -217,6 +217,194 @@ THE VISION:
 - This is a "Double Bottom Line" investment: Massive financial returns + Massive social impact.
 `;
 
+export const EBURON_FLYER_CONTENT = `
+TOPIC: Eburon Flyer
+TITLE: EBURON FLYER PROJECT — FULL SCOPE AND MAIN OBJECTIVE
+
+## 1. Introduction
+Humanity’s dependence on ground-based transportation has shaped the modern world—roads, trucks, and fossil fuels have carried industry and civilization forward. Yet these systems are costly, carbon-heavy, and geographically limited. In many regions, especially those defined by mountains, forests, or dispersed islands, land transport becomes either prohibitively expensive or technically impossible.
+The **Eburon Flyer Project** arises from this constraint as a practical and visionary alternative: a low-power, helium-lifted aerial mobility platform that replaces brute-force propulsion with the elegance of buoyancy. Rather than burning energy to fight gravity, the Eburon Flyer floats within it—sustained by physics, guided by autonomy, and powered by renewable energy.
+Eburon Flyer aims to **redefine how we move goods and people through the air** by combining the time-tested principle of lighter-than-air flight with modern materials, AI-assisted navigation, and decentralized solar-electric systems. Its mission is simple yet profound: **to make aerial transport cheaper than land travel**, scalable from individual food deliveries to large-scale cargo logistics and eco-tourism.
+
+## 2. Project Overview
+The Eburon Flyer platform is conceived as a **modular family of buoyant flyers** that span three scales:
+1. **Micro-Flyers** — palm-to-backpack-sized helium drones designed for local delivery of small goods such as food, medicine, and parcels within urban or semi-urban areas.
+2. **Meso-Flyers** — mid-sized craft for rural logistics, capable of carrying up to several hundred kilograms of cargo over distances up to 100 km, powered primarily by solar energy and compressed-air propulsion.
+3. **Macro-Flyers** — passenger-capable airships for low-altitude tourism, forest observation, and humanitarian access to road-less environments.
+Each model operates under the same principles: helium buoyancy to reduce weight, electric or compressed-air propulsion for motion, and AI-based flight optimization to minimize energy use.
+Unlike conventional drones or aircraft, **Eburon Flyer does not rely on high-thrust engines or extensive runway infrastructure**. Its efficiency lies in the physics of displacement—Archimedes’ principle in gaseous form—where lift is achieved by the mass of air displaced by helium, a gas lighter than the surrounding atmosphere.
+
+## 3. Mission Statement
+Eburon Flyer’s mission is to **revolutionize aerial mobility** through sustainable buoyant flight, enabling new economic, ecological, and humanitarian pathways.
+By combining helium lift with solar-electric power, we aim to **create a network of autonomous flyers** that can deliver food, goods, and access to communities previously unreachable—while consuming only a fraction of the energy used by traditional air or land transport.
+
+## 4. Vision Statement
+The vision of Eburon Flyer is to **democratize flight**—making it as accessible and affordable as road transport, yet cleaner and quieter. We see a future sky populated not by roaring machines, but by **graceful, self-sustaining flyers** that connect humanity across geography, culture, and climate.
+This future reimagines air mobility as a **commons**—not the privilege of airlines, but the daily utility of citizens, farmers, explorers, and first responders.
+Our ultimate ambition is to position Eburon Flyer as the **baseline technology for sustainable atmospheric logistics**, aligning innovation with planetary balance.
+
+## 5. Scientific Foundations
+### 5.1 Buoyancy and Helium Lift
+Eburon Flyer’s primary lifting mechanism follows **Archimedes’ principle**: a body immersed in a fluid experiences an upward force equal to the weight of the fluid it displaces.
+At sea level, air density averages 1.225 kg/m³. Helium, at the same temperature and pressure, has a density of about 0.1786 kg/m³. Therefore, each cubic meter of helium can theoretically lift **≈1.047 kg**, less the weight of the envelope and structure.
+Helium’s non-flammability and chemical inertness make it safer than hydrogen, while its atomic simplicity minimizes molecular diffusion through composite materials.
+### 5.2 Gas Containment
+The efficiency of helium use depends on the integrity of its containment. The Eburon Flyer’s envelope is made of **multi-layer laminate polymers** combining high-strength fabric with ultra-low permeability coatings such as ethylene-vinyl alcohol (EVOH). Embedded nanocomposite layers reduce gas diffusion by over 60 %, extending operational life beyond one year per refill.
+### 5.3 Energy Model
+Traditional drones consume 100–200 Wh per kilometer; Eburon Flyer targets **under 10 Wh/km** by offloading most lift to helium. Its propulsion system uses small air-compressor jet engines that accelerate ambient air, providing directional thrust with minimal energy expenditure.
+Solar panels embedded on the upper envelope harvest 200–300 W/m² in daylight. Paired with solid-state lithium-sulfur or graphene batteries, the craft can remain airborne continuously with modest diurnal energy storage.
+### 5.4 Compressed-Air Jet Propulsion
+Rather than burning fuel, Eburon Flyer’s propulsion relies on **pressurized air release through precision nozzles**. Electric compressors draw in and store air in carbon-fiber tanks. When released, this air accelerates through a variable-geometry nozzle, creating silent thrust.
+This method avoids combustion, reducing both acoustic and thermal signatures—ideal for urban or environmental operations.
+### 5.5 Control and Stability
+Autonomous stability is achieved through a combination of:
+* **Trimable ballast** using micro-compressors to balance buoyancy.
+* **AI flight controller** with feedback loops from gyroscopes, pressure sensors, and GPS.
+* **Vector-thrust control** using compressor nozzles for yaw and pitch adjustments.
+### 5.6 Environmental Footprint
+Eburon Flyer produces **zero direct emissions** and virtually no noise. Its low altitude (typically < 200 m) avoids interference with commercial aviation while reducing visual and acoustic pollution.
+Every kilogram of payload lifted by helium replaces approximately 0.5 liters of gasoline worth of CO₂ emissions in comparable drone delivery systems.
+
+## 6. Design Philosophy
+### 6.1 Simplicity over Force
+Where conventional flight demands energy to overcome gravity, Eburon Flyer uses physics to avoid that fight altogether.
+By floating naturally, propulsion serves only navigation—not lift—cutting power needs by 70–90 %.
+### 6.2 Scalability and Modularity
+The platform’s modular architecture allows interchangeable components:
+* Envelope sizes ranging from 1 m³ to 400 m³.
+* Swappable propulsion units (single, twin, or vector).
+* Modular payload compartments for cargo, camera, or passenger modules.
+### 6.3 Autonomy and AI Integration
+Each flyer contains an onboard **Eburon Neural Flight Core (ENFC)**:
+* Adaptive pathfinding optimized for wind and solar conditions.
+* AI-based collision avoidance and no-fly-zone awareness.
+* Self-diagnostic health monitoring for predictive maintenance.
+### 6.4 Materials and Construction
+The structure uses carbon-fiber frames with graphene-reinforced joints, balancing rigidity with minimal mass. The helium chamber maintains shape under internal pressure, while flexible solar films adhere seamlessly across the dorsal surface.
+
+## 7. Use-Case Domains
+### 7.1 Urban Food and Parcel Delivery
+In congested megacities, conventional drones face limits—short range, battery depletion, and noise.
+The Eburon Micro-Flyer replaces them with a **silent, buoyant courier** that hovers over traffic lanes, powered by sunlight and helium lift.
+Its delivery module descends via micro-winch to precise GPS coordinates, consuming less than 5 % of the energy used by rotor-based drones.
+### 7.2 Cargo and Supply Chain Support
+Eburon Meso-Flyers can handle mid-weight cargo such as agricultural produce, spare parts, or humanitarian supplies.
+Operating at 60–100 km range with minimal infrastructure, they enable **point-to-point logistics** between rural suppliers and urban centers without dependence on roads.
+### 7.3 Tourism and Exploration
+Eburon Macro-Flyers open access to landscapes unreachable by road—rainforests, highlands, island chains.
+Their slow, stable, silent movement creates a **floating observatory experience** that merges exploration with conservation, leaving no environmental trace.
+### 7.4 Emergency and Humanitarian Relief
+In flood, earthquake, or war zones where infrastructure collapses, buoyant flyers can remain airborne for days, carrying medical kits, food, and communication modules.
+Their ability to hover and land vertically ensures access where helicopters are too costly or dangerous.
+
+## 8. Economic Impact and Comparative Advantage
+### 8.1 Cost Structure
+By reducing energy dependency, the Eburon Flyer achieves **operational costs 5–10× lower than drones or trucks**.
+Helium replenishment is infrequent; maintenance revolves around battery cycling and envelope inspection.
+Solar energy offers near-zero fuel cost after deployment.
+### 8.2 Infrastructure Independence
+Unlike land vehicles that require roads or aircraft that need runways, Eburon Flyer operates **vertically and autonomously**.
+This independence allows service networks to expand in developing regions without heavy capital investment.
+### 8.3 Market Integration
+Initial markets:
+* Urban delivery in high-density Asian and European cities.
+* Cargo logistics for agricultural exporters.
+* Tourism partnerships for aerial eco-tours.
+* Government contracts for disaster response.
+Future expansions may include persistent-airborne communication relays and surveillance systems for environmental monitoring.
+
+## 9. Social and Environmental Contribution
+Eburon Flyer contributes to **social equity** by enabling affordable logistics for remote communities and reducing urban pollution.
+It aligns with **UN SDGs**:
+* **Goal 9:** Industry, Innovation, and Infrastructure
+* **Goal 11:** Sustainable Cities and Communities
+* **Goal 13:** Climate Action
+The project also pioneers a **non-extractive helium management system**, recycling captured gas through return hubs to minimize depletion of global reserves.
+
+## 10. Research Objectives
+1. **Develop a validated physical model** of helium lift performance under varying atmospheric pressures and temperatures.
+2. **Design a prototype compressed-air propulsion system** optimized for continuous low-power thrust.
+3. **Integrate solar energy management systems** with AI-controlled charge balancing.
+4. **Simulate and test autonomous flight stability** in variable wind conditions.
+5. **Establish scalability metrics** to project from micro- to macro-flyers.
+6. **Perform life-cycle assessments** comparing Eburon Flyer emissions to road and drone transport.
+
+## 11. Engineering Architecture
+### 11.1 Subsystems
+* **Envelope Unit:** multi-layer helium containment with embedded sensors for pressure and temperature.
+* **Propulsion Unit:** dual or quad compressor jets for yaw/pitch control and forward motion.
+* **Energy Unit:** solar array + battery + power controller.
+* **Avionics:** GPS, IMU, LIDAR, barometer, AI flight computer.
+* **Payload Interface:** modular dock for delivery box, camera, or passenger pod.
+### 11.2 Software Stack
+* **Eburon OS:** lightweight RTOS with secure OTA updates.
+* **Autonomy Layer:** pathfinding, wind compensation, obstacle mapping.
+* **Fleet Orchestrator:** central AI coordinating multiple flyers for delivery routing and collision avoidance.
+
+## 12. Risk Analysis
+### 12.1 Technical Risks
+* Helium scarcity and cost → mitigated by recovery and recycling systems.
+* Weather sensitivity → solved via predictive routing algorithms and pressure regulation.
+* Material degradation → mitigated by UV-resistant composites.
+### 12.2 Regulatory Risks
+Airspace management remains a developing field. The project will adhere to civil aviation guidelines for low-altitude unmanned systems, integrating transponder beacons and geofencing.
+### 12.3 Market Risks
+Public adoption hinges on trust and cost. Pilot programs with municipal partners and logistic firms will validate performance and safety.
+
+## 13. Deployment Phases
+### **Phase I — Research and Simulation (Year 1)**
+* CFD modeling of helium lift and air compression jets.
+* Material stress testing under UV and thermal cycles.
+* Wind-tunnel trials for stability and control.
+### **Phase II — Prototype and Field Trials (Year 2)**
+* Build micro-flyer prototype for food delivery use-case.
+* Urban flight tests under regulatory supervision.
+* Gather telemetry to refine AI flight controller.
+### **Phase III — Scale Expansion (Year 3–4)**
+* Develop meso-flyer cargo model with 50 kg capacity.
+* Integrate solar-battery hybrid system.
+* Begin commercial pilot projects.
+### **Phase IV — Global Network Deployment (Year 5 +)**
+* Establish regional manufacturing hubs.
+* Deploy fleets across logistics, tourism, and humanitarian sectors.
+* Implement Eburon Cloud Orchestrator for global flight coordination.
+
+## 14. Expected Outcomes
+1. **Operational Energy Reduction:** At least 80 % less power per km compared to conventional drones.
+2. **Cost Reduction:** Delivery costs below $0.02/km kg.
+3. **Sustainability Impact:** > 90 % CO₂ reduction versus combustion-based air transport.
+4. **Accessibility:** Safe flight in populated or remote zones with minimal noise pollution.
+5. **Economic Inclusion:** Enabling micro-business logistics in underserved areas.
+
+## 15. Strategic Partnerships
+Eburon Flyer invites collaboration across:
+* **Universities** for aerodynamics, materials, and AI research.
+* **Energy companies** for solar integration.
+* **Municipal governments** for smart-city deployment.
+* **Humanitarian NGOs** for rapid-response logistics.
+Joint ventures will accelerate scaling while maintaining safety and sustainability standards.
+
+## 16. Ethical and Safety Framework
+Autonomous flight must respect privacy, environmental stewardship, and safety.
+Eburon Flyer incorporates:
+* End-to-end encrypted communication.
+* Automatic altitude limits and emergency descent protocols.
+* Real-time weather adaptation and avoidance systems.
+* Transparent data-sharing policies for regulators.
+The project’s ethical framework treats the **sky as shared space**, guided by responsibility rather than domination.
+
+## 17. Long-Term Vision: The Air Mobility Continuum
+Eburon Flyer represents more than a vehicle—it’s a **mobility philosophy**.
+The same technology enabling a food delivery craft can scale to a regional airship network or inter-island cargo platform.
+Ultimately, Eburon Flyer aims to establish a **permanent atmospheric infrastructure**—a layer of smart, solar, helium-powered flyers continuously operating between ground and satellite networks, forming the **Eburon Sky Grid**.
+
+## 18. Conclusion
+The Eburon Flyer Project stands at the crossroads of physics, sustainability, and human imagination. By fusing the ancient principle of buoyancy with the modern disciplines of AI and renewable energy, it challenges the notion that flight must be loud, expensive, or polluting.
+Its promise lies not only in moving goods faster but in **lifting human potential higher**—creating a quiet revolution in the skies where every cubic meter of helium carries both matter and meaning.
+Eburon Flyer is more than a machine.
+It is a **new language of motion**, one that speaks through silence, sunlight, and air itself.
+`;
+
 export const GENERAL_SYSTEM_INSTRUCTION = `You are EBURON, a high-precision multi-modal intelligence system.
 Your mission is A–Z coverage of all intelligence tasks: conversation, development, robotics, and operations.
 
