@@ -27,7 +27,7 @@ const Settings: React.FC = () => {
       if (localTopic && validTopics.includes(localTopic)) {
           setTopic(localTopic);
       } else {
-          // Auto-correction for invalid or legacy topics
+          // Auto-correction for invalid or legacy topics (fixes network errors caused by missing content)
           setTopic('Eburon Aegis Vision');
           localStorage.setItem('eburon_topic', 'Eburon Aegis Vision');
       }
@@ -55,6 +55,7 @@ const Settings: React.FC = () => {
                       setTopic(data.topic);
                       localStorage.setItem('eburon_topic', data.topic);
                   } else {
+                      // Force update if DB has stale topic
                       setTopic('Eburon Aegis Vision');
                       localStorage.setItem('eburon_topic', 'Eburon Aegis Vision');
                   }

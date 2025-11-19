@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useLiveApi } from '../hooks/useLiveApi';
 import AudioVisualizer from './AudioVisualizer';
@@ -55,7 +54,8 @@ const LiveAgent: React.FC = () => {
   useEffect(() => {
     // Only update user activity if the agent is NOT speaking.
     // When agent is speaking, status.volume represents agent audio, not user mic.
-    if (!status.isSpeaking && status.volume > 0.02) {
+    // Increased threshold to 0.05 to filter out background noise/fans.
+    if (!status.isSpeaking && status.volume > 0.05) {
       lastUserActivityRef.current = Date.now();
     }
   }, [status.volume, status.isSpeaking]);
@@ -65,10 +65,11 @@ const LiveAgent: React.FC = () => {
     if (status.isConnected && !hasStartedRef.current) {
       hasStartedRef.current = true;
       // Send the start trigger command
-      // Wait 2 seconds to ensure connection stability before triggering speech
+      // Wait 4 seconds (increased from 2s) to ensure connection stability before triggering speech
+      // "Internal Error" often happens if text is sent while audio pipeline is still initializing
       setTimeout(() => {
           sendText("START BROADCAST NOW. Begin the 8-minute presentation immediately. Speak continuously. Do not stop. If you must pause, use a filler sound, then continue. Go.");
-      }, 2000);
+      }, 4000);
     } else if (!status.isConnected) {
       hasStartedRef.current = false;
     }
@@ -130,10 +131,8 @@ const LiveAgent: React.FC = () => {
                 // Check if user has been silent recently (avoid interrupting user)
                 const timeSinceUserActivity = Date.now() - lastUserActivityRef.current;
                 
-                // Only auto-continue if user has been silent for > 1.5 seconds
-                // If the user was silent WHILE the agent was speaking, timeSinceUserActivity will be large,
-                // so this will trigger immediately (after the 100ms timeout).
-                if (timeSinceUserActivity > 1500) {
+                // Reduced wait time from 1500ms to 800ms for faster response
+                if (timeSinceUserActivity > 800) {
                     // Send strict silent continuation directive
                     sendText("[SYSTEM] CONTINUATION SIGNAL: The audio stream paused. Resume your speech immediately from where you stopped. Do not acknowledge this interruption."); 
                 }
@@ -240,7 +239,7 @@ const LiveAgent: React.FC = () => {
 
                  {status.error && (
                      <div className="mt-6">
-                        <p className="text-red-400 text-xs font-mono bg-red-950/30 py-2 px-3 rounded border border-red-900/50 inline-block">{status.error}</p>
+                        <p className="text-red-400 text-xs font-mono bg-red-950/30 py-2 px-3 rounded border border-red-900/50 inline-block max-w-xs break-words">{status.error}</p>
                      </div>
                  )}
              </div>

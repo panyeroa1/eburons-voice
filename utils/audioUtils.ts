@@ -20,12 +20,57 @@ export function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
+/**
+ * Downsamples audio buffer from source rate to target rate (16kHz)
+ */
+export function downsampleBuffer(buffer: Float32Array, sourceRate: number, targetRate: number): Float32Array {
+  if (sourceRate === targetRate) {
+    return buffer;
+  }
+  if (sourceRate < targetRate) {
+    console.warn("Upsampling not supported, returning original");
+    return buffer;
+  }
+
+  const ratio = sourceRate / targetRate;
+  const newLength = Math.round(buffer.length / ratio);
+  const result = new Float32Array(newLength);
+  
+  let offsetResult = 0;
+  let offsetBuffer = 0;
+  
+  while (offsetResult < newLength) {
+    const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
+    
+    // Simple averaging (boxcar filter) for downsampling
+    // This prevents aliasing better than just picking every Nth sample
+    let accum = 0;
+    let count = 0;
+    
+    for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+      accum += buffer[i];
+      count++;
+    }
+    
+    result[offsetResult] = count > 0 ? accum / count : 0;
+    
+    offsetResult++;
+    offsetBuffer = nextOffsetBuffer;
+  }
+  
+  return result;
+}
+
 export function createPcmBlob(data: Float32Array): Blob {
   const l = data.length;
   const int16 = new Int16Array(l);
   for (let i = 0; i < l; i++) {
-    // Convert float32 (-1.0 to 1.0) to int16 (-32768 to 32767)
-    const s = Math.max(-1, Math.min(1, data[i]));
+    // Sanitize input: fix NaN or Infinity which can crash the encoder or API
+    let val = data[i];
+    if (!Number.isFinite(val)) val = 0;
+    
+    // Clamp and convert float32 (-1.0 to 1.0) to int16 (-32768 to 32767)
+    const s = Math.max(-1, Math.min(1, val));
     int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
   }
   return {
