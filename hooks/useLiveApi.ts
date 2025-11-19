@@ -113,6 +113,21 @@ export const useLiveApi = () => {
             
             sourceRef.current = source;
             processorRef.current = processor;
+
+            // IMMEDIATE START TRIGGER
+            // Send a text command to kickstart the agent immediately after connection.
+            sessionPromise.then(session => {
+                // Cast to any to handle missing type definition for send method
+                const s = session as any;
+                if (typeof s.send === 'function') {
+                    s.send({
+                        clientContent: {
+                            turns: [{ role: 'user', parts: [{ text: "Start the presentation now. Follow the 8-minute structure, ensuring you cover all key points, and always end with a strong recap and conclusion." }] }],
+                            turnComplete: true
+                        }
+                    });
+                }
+            });
           },
           onmessage: async (msg: LiveServerMessage) => {
             if (msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data) {
