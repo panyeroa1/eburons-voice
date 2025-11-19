@@ -22,6 +22,9 @@ const Settings: React.FC = () => {
       localStorage.setItem('eburon_voice_style', voiceStyle);
       localStorage.setItem('eburon_language', language);
       
+      // Dispatch event to notify LiveAgent to update its display immediately
+      window.dispatchEvent(new Event('eburon_config_updated'));
+
       setIsSaved(true);
       // Hide message after 3 seconds
       setTimeout(() => setIsSaved(false), 3000);
@@ -190,3 +193,4 @@ const Settings: React.FC = () => {
 };
 
 export default Settings;
+    

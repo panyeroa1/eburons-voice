@@ -20,7 +20,10 @@ const App: React.FC = () => {
             We use CSS opacity and pointer-events to hide it without unmounting,
             ensuring the explanation continues in the background during navigation.
         */}
-        <div className={`absolute inset-0 w-full h-full transition-opacity duration-300 ${mode === AppMode.LIVE_AGENT ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'}`}>
+        <div 
+            className={`absolute inset-0 w-full h-full transition-opacity duration-300 ${mode === AppMode.LIVE_AGENT ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'}`}
+            aria-hidden={mode !== AppMode.LIVE_AGENT}
+        >
              <LiveAgent />
         </div>
 

@@ -152,7 +152,7 @@ export const useLiveApi = () => {
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } }, // Charon for authoritative tone
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Orus' } }, // Charon for authoritative tone
           },
           systemInstruction: { parts: [{ text: systemInstruction }] },
           inputAudioTranscription: {}, // Enabled for stop/start logic - Removed invalid model param
@@ -201,28 +201,6 @@ export const useLiveApi = () => {
             
             sourceRef.current = source;
             processorRef.current = processor;
-
-            // IMMEDIATE START TRIGGER
-            // Send a text command to kickstart the agent immediately after connection.
-            // Use setTimeout to ensure the socket is ready.
-            setTimeout(() => {
-                sessionPromise.then(session => {
-                    // Cast to any to handle missing type definition for send method
-                    const s = session as any;
-                    if (typeof s.send === 'function') {
-                        try {
-                            s.send({
-                                clientContent: {
-                                    turns: [{ role: 'user', parts: [{ text: "START BROADCAST NOW. Begin the 8-minute presentation immediately. Speak continuously. Do not stop. If you must pause, use a filler sound, then continue. Go." }] }],
-                                    turnComplete: true
-                                }
-                            });
-                        } catch (e) {
-                            console.warn("Failed to send start trigger", e);
-                        }
-                    }
-                }).catch(() => {});
-            }, 500);
           },
           onmessage: async (msg: LiveServerMessage) => {
             if (msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data) {

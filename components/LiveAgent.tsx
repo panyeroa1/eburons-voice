@@ -1,19 +1,53 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useLiveApi } from '../hooks/useLiveApi';
 import AudioVisualizer from './AudioVisualizer';
-import { Mic, PhoneOff, Radio, Loader2, RefreshCw } from 'lucide-react';
+import { Mic, PhoneOff, Radio, Loader2, RefreshCw, Settings2 } from 'lucide-react';
 
 const LiveAgent: React.FC = () => {
   const { connect, disconnect, sendText, status, transcription } = useLiveApi();
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const disconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isFinishedRef = useRef(false);
+  const isConcludingRef = useRef(false);
+  const hasStartedRef = useRef(false);
   const lastUserActivityRef = useRef<number>(Date.now());
+
+  // Local state for configuration display
+  const [config, setConfig] = useState({
+    topic: 'Trafficking Early Warning System',
+    language: 'English',
+    voiceStyle: 'Dutch Flemish expressive'
+  });
+
+  const loadConfig = () => {
+    setConfig({
+        topic: localStorage.getItem('eburon_topic') || 'Trafficking Early Warning System',
+        language: localStorage.getItem('eburon_language') || 'English',
+        voiceStyle: localStorage.getItem('eburon_voice_style') || 'Dutch Flemish expressive'
+    });
+  };
+
+  // Load config on mount and when status changes to disconnected (to refresh if settings changed)
+  useEffect(() => {
+    if (!status.isConnected) {
+        loadConfig();
+    }
+  }, [status.isConnected]);
+
+  // Listen for global config updates
+  useEffect(() => {
+    const handleConfigUpdate = () => loadConfig();
+    window.addEventListener('eburon_config_updated', handleConfigUpdate);
+    return () => window.removeEventListener('eburon_config_updated', handleConfigUpdate);
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       disconnect();
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      if (disconnectTimerRef.current) clearTimeout(disconnectTimerRef.current);
     };
   }, [disconnect]);
 
@@ -24,34 +58,69 @@ const LiveAgent: React.FC = () => {
     }
   }, [status.volume]);
 
+  // Auto-Start Logic: Trigger the start message when connected
+  useEffect(() => {
+    if (status.isConnected && !hasStartedRef.current) {
+      hasStartedRef.current = true;
+      // Send the start trigger command
+      setTimeout(() => {
+          sendText("START BROADCAST NOW. Begin the 8-minute presentation immediately. Speak continuously. Do not stop. If you must pause, use a filler sound, then continue. Go.");
+      }, 500);
+    } else if (!status.isConnected) {
+      hasStartedRef.current = false;
+    }
+  }, [status.isConnected, sendText]);
+
   // Auto-Director Logic - Runs on state changes
   useEffect(() => {
     if (!status.isConnected) {
         isFinishedRef.current = false;
+        isConcludingRef.current = false;
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        if (disconnectTimerRef.current) clearTimeout(disconnectTimerRef.current);
         return;
     }
 
     // 1. Check for Finish Keywords in User Transcription
-    if (transcription.toLowerCase().match(/(wrap up|finish|conclusion|stop)/)) {
-        if (!isFinishedRef.current) {
-            isFinishedRef.current = true;
-            // Silent command to wrap up
-            sendText("[SYSTEM] Okay, please wrap up now with a strong, memorable conclusion.");
-            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-            return;
-        }
+    // We check this only if we aren't already in the concluding phase
+    if (!isConcludingRef.current && transcription.toLowerCase().match(/(wrap up|finish|conclusion|stop)/)) {
+        isFinishedRef.current = true;
+        isConcludingRef.current = true;
+        
+        // Silent command to wrap up
+        sendText("[SYSTEM] The user has requested to finish. Wrap up now with a strong, memorable conclusion. Do not ask any further questions. Goodbye.");
+        
+        // Clear any existing silence timers immediately
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        return;
     }
 
-    // 2. Auto-Continue Logic
-    // Only trigger if the topic is not concluded
+    // 2. Concluding Sequence Monitor
+    if (isConcludingRef.current) {
+        if (status.isSpeaking) {
+            // Agent is speaking the conclusion: ensure we don't disconnect yet
+            if (disconnectTimerRef.current) {
+                clearTimeout(disconnectTimerRef.current);
+                disconnectTimerRef.current = null;
+            }
+        } else {
+            // Agent has stopped speaking (presumably finished conclusion): start disconnect timer
+            if (!disconnectTimerRef.current) {
+                disconnectTimerRef.current = setTimeout(() => {
+                    disconnect();
+                }, 4000); // 4 seconds of silence after wrap-up = Session End
+            }
+        }
+        return; // Bypass normal auto-continue logic
+    }
+
+    // 3. Auto-Continue Logic (Normal Operation)
     if (!isFinishedRef.current) {
         if (status.isSpeaking) {
             // Agent is speaking: Clear timer
             if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
         } else {
             // Agent is silent: Reset and Start Timer
-            // We reset on every state change to ensure we don't interrupt a conversational turn.
             if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
             
             silenceTimerRef.current = setTimeout(() => {
@@ -59,7 +128,6 @@ const LiveAgent: React.FC = () => {
                 const timeSinceUserActivity = Date.now() - lastUserActivityRef.current;
                 
                 // Only auto-continue if user has been silent for > 1.5 seconds
-                // Reduced from 2000ms to 1000ms for tighter, more continuous flow
                 if (timeSinceUserActivity > 1500) {
                     // Send specific continue prompt as requested by user
                     sendText("[SYSTEM] IGNORE SILENCE. Keep speaking. Don't stop."); 
@@ -67,11 +135,11 @@ const LiveAgent: React.FC = () => {
             }, 1000); // 1s silence triggers continuation check
         }
     } else {
-        // If finished, ensure no timers are running
+        // If finished but not concluding (rare state), ensure no timers
         if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     }
 
-  }, [status.isConnected, status.isSpeaking, transcription, sendText]);
+  }, [status.isConnected, status.isSpeaking, transcription, sendText, disconnect]);
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-zinc-900 to-black text-white relative overflow-hidden">
@@ -122,7 +190,6 @@ const LiveAgent: React.FC = () => {
                      <p className="text-cyan-500 text-xs font-mono tracking-widest">EBURON IS SPEAKING...</p>
                  )}
 
-                 {/* Start Prompt - Shows when connected, silent, and no transcription yet */}
                  {!status.isSpeaking && !transcription && !status.error && (
                      <p className="text-amber-500 text-sm font-bold tracking-wide animate-bounce">
                          INITIALIZING BROADCAST...
@@ -135,16 +202,22 @@ const LiveAgent: React.FC = () => {
             </div>
         )}
 
+        {/* Standby Config Display - Simplified */}
         {!status.isConnected && !status.isConnecting && !status.isReconnecting && (
-             <div className="mt-8 px-8 text-center max-w-md">
-                 <p className="text-zinc-500 text-xs tracking-widest font-mono">
-                    {status.error ? "SYSTEM ERROR - PLEASE RESTART" : "SYSTEM STANDBY"}
-                 </p>
-                 <p className="text-zinc-600 text-[10px] mt-2 font-mono uppercase">
-                     Press Start to Begin Intelligence Feed
-                 </p>
+             <div className="mt-12 px-6 w-full max-w-md text-center">
+                 <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                     <h3 className="text-xl font-bold text-white leading-tight tracking-tight">
+                        "{config.topic}"
+                     </h3>
+                     <p className="text-xs text-zinc-500 font-mono tracking-widest uppercase">
+                        {config.language} <span className="text-amber-500">•</span> {config.voiceStyle}
+                     </p>
+                 </div>
+
                  {status.error && (
-                     <p className="text-red-400 text-sm mt-2">{status.error}</p>
+                     <div className="mt-6">
+                        <p className="text-red-400 text-xs font-mono bg-red-950/30 py-2 px-3 rounded border border-red-900/50 inline-block">{status.error}</p>
+                     </div>
                  )}
              </div>
         )}
@@ -157,35 +230,35 @@ const LiveAgent: React.FC = () => {
         )}
       </div>
 
-      {/* Controls */}
-      <div className="p-8 pb-12 z-10 flex justify-center items-center gap-6">
+      {/* Controls - Rectangular Buttons */}
+      <div className="p-8 pb-12 z-10 flex justify-center items-center w-full">
          {!status.isConnected ? (
              <button 
                 onClick={connect}
                 disabled={status.isConnecting || status.isReconnecting}
-                className={`group relative inline-flex items-center justify-center w-20 h-20 rounded-full transition-all duration-300 shadow-lg 
+                className={`w-full max-w-sm py-4 rounded-xl font-mono font-bold text-sm tracking-widest transition-all duration-300 shadow-lg flex items-center justify-center gap-3
                     ${status.isConnecting || status.isReconnecting
-                        ? 'bg-zinc-800 cursor-wait' 
-                        : 'bg-amber-600 hover:bg-amber-500 hover:shadow-amber-500/30 active:scale-95'
+                        ? 'bg-zinc-800 text-zinc-500 cursor-wait border border-zinc-700' 
+                        : 'bg-amber-600 text-white hover:bg-amber-500 hover:shadow-amber-500/20 active:scale-95 border border-amber-500'
                     }`}
              >
                 {status.isConnecting || status.isReconnecting ? (
-                    <Loader2 className="w-8 h-8 text-zinc-500 animate-spin" />
+                    <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {status.isConnecting ? 'ESTABLISHING UPLINK...' : 'RECONNECTING...'}
+                    </>
                 ) : (
-                    <Mic className="w-8 h-8 text-white group-hover:scale-110 transition-transform" />
+                    <>
+                        START LIVE SESSION
+                    </>
                 )}
-                
-                <span className="absolute -bottom-8 text-xs font-mono text-zinc-500 group-hover:text-white transition-colors whitespace-nowrap">
-                    {status.isConnecting ? 'CONNECTING...' : status.isReconnecting ? 'RETRYING...' : 'START SESSION'}
-                </span>
              </button>
          ) : (
             <button 
                 onClick={disconnect}
-                className="group relative inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-600 hover:bg-red-500 transition-all duration-300 shadow-lg active:scale-95"
+                className="w-full max-w-sm py-4 rounded-xl font-mono font-bold text-sm tracking-widest transition-all duration-300 shadow-lg flex items-center justify-center gap-3 bg-red-900/80 text-red-200 border border-red-800 hover:bg-red-800 hover:text-white active:scale-95"
              >
-                <PhoneOff className="w-8 h-8 text-white group-hover:scale-110 transition-transform" />
-                <span className="absolute -bottom-8 text-xs font-mono text-red-500 group-hover:text-red-400 transition-colors whitespace-nowrap">END SESSION</span>
+                END SESSION
              </button>
          )}
       </div>
@@ -202,3 +275,4 @@ const LiveAgent: React.FC = () => {
 };
 
 export default LiveAgent;
+    
