@@ -211,6 +211,11 @@ export const useLiveApi = () => {
       CURRENT CONFIGURATION:
       - Style: ${voiceStyle}
       - Language: ${language}
+      
+      *** AUDIO TAG ENFORCEMENT (FINAL REMINDER) ***
+      - You will use bracketed tags like [sigh], [pause], [excited].
+      - **THESE ARE SILENT DIRECTIONS.** NEVER read them aloud.
+      - If you see [laugh], you laugh. You do not say the word "laugh".
       `;
 
       // Connect to Gemini Live

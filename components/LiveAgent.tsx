@@ -53,10 +53,12 @@ const LiveAgent: React.FC = () => {
 
   // Track User Activity (Volume based) - Updates frequently
   useEffect(() => {
-    if (status.volume > 0.02) {
+    // Only update user activity if the agent is NOT speaking.
+    // When agent is speaking, status.volume represents agent audio, not user mic.
+    if (!status.isSpeaking && status.volume > 0.02) {
       lastUserActivityRef.current = Date.now();
     }
-  }, [status.volume]);
+  }, [status.volume, status.isSpeaking]);
 
   // Auto-Start Logic: Trigger the start message when connected
   useEffect(() => {
@@ -128,12 +130,14 @@ const LiveAgent: React.FC = () => {
                 // Check if user has been silent recently (avoid interrupting user)
                 const timeSinceUserActivity = Date.now() - lastUserActivityRef.current;
                 
-                // Only auto-continue if user has been silent for > 2.0 seconds
-                if (timeSinceUserActivity > 2000) {
+                // Only auto-continue if user has been silent for > 1.5 seconds
+                // If the user was silent WHILE the agent was speaking, timeSinceUserActivity will be large,
+                // so this will trigger immediately (after the 100ms timeout).
+                if (timeSinceUserActivity > 1500) {
                     // Send strict silent continuation directive
                     sendText("[SYSTEM] CONTINUATION SIGNAL: The audio stream paused. Resume your speech immediately from where you stopped. Do not acknowledge this interruption."); 
                 }
-            }, 2000); // 2s silence triggers continuation check
+            }, 100); // Instantly check (100ms) to prevent long pauses
         }
     } else {
         // If finished but not concluding (rare state), ensure no timers
