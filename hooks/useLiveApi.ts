@@ -197,7 +197,13 @@ export const useLiveApi = () => {
             };
 
             source.connect(processor);
-            processor.connect(inputContext.destination);
+            
+            // NEW: Use a GainNode with 0 gain to prevent audio loopback (echo) 
+            // while keeping the ScriptProcessor active for input processing.
+            const gainNode = inputContext.createGain();
+            gainNode.gain.value = 0;
+            processor.connect(gainNode);
+            gainNode.connect(inputContext.destination);
             
             sourceRef.current = source;
             processorRef.current = processor;

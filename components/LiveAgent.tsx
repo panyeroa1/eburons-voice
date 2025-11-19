@@ -63,9 +63,10 @@ const LiveAgent: React.FC = () => {
     if (status.isConnected && !hasStartedRef.current) {
       hasStartedRef.current = true;
       // Send the start trigger command
+      // Wait 2 seconds to ensure connection stability before triggering speech
       setTimeout(() => {
           sendText("START BROADCAST NOW. Begin the 8-minute presentation immediately. Speak continuously. Do not stop. If you must pause, use a filler sound, then continue. Go.");
-      }, 500);
+      }, 2000);
     } else if (!status.isConnected) {
       hasStartedRef.current = false;
     }
@@ -275,4 +276,3 @@ const LiveAgent: React.FC = () => {
 };
 
 export default LiveAgent;
-    
