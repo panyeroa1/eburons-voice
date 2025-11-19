@@ -1,13 +1,31 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
-import { ORUS_SYSTEM_PROMPT, DECOBU_SECURITY_CONTENT, TRAFFICKING_SYSTEM_CONTENT } from '../constants';
+import { 
+    ORUS_SYSTEM_PROMPT, 
+    DECOBU_SECURITY_CONTENT, 
+    TRAFFICKING_SYSTEM_CONTENT, 
+    FLEMISH_EXPRESSIONS_CONTENT,
+    TAGALOG_EXPRESSIONS_CONTENT,
+    TURKISH_EXPRESSIONS_CONTENT,
+    ARABIC_EXPRESSIONS_CONTENT,
+    FRENCH_EXPRESSIONS_CONTENT,
+    MALAYALAM_EXPRESSIONS_CONTENT,
+    SPANISH_EXPRESSIONS_CONTENT,
+    GERMAN_EXPRESSIONS_CONTENT,
+    HINDI_EXPRESSIONS_CONTENT,
+    JAPANESE_EXPRESSIONS_CONTENT,
+    KOREAN_EXPRESSIONS_CONTENT,
+    ITALIAN_EXPRESSIONS_CONTENT,
+    RUSSIAN_EXPRESSIONS_CONTENT
+} from '../constants';
 import { createPcmBlob, base64ToUint8Array, decodeAudioData } from '../utils/audioUtils';
 import { LiveStatus } from '../types';
 
 export const useLiveApi = () => {
   const [status, setStatus] = useState<LiveStatus>({
     isConnected: false,
+    isConnecting: false,
+    isReconnecting: false,
     isSpeaking: false,
     isListening: false,
     volume: 0,
@@ -21,8 +39,28 @@ export const useLiveApi = () => {
   const nextStartTimeRef = useRef<number>(0);
   const sessionRef = useRef<any>(null);
   const [transcription, setTranscription] = useState<string>('');
+  
+  // Retry Logic Refs
+  const isIntentionalDisconnectRef = useRef(false);
+  const reconnectAttemptRef = useRef(0);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const connectRef = useRef<(() => Promise<void>) | null>(null);
+  const MAX_RETRIES = 3;
 
   const connect = useCallback(async () => {
+    if (sessionRef.current) return; // Prevent double connection
+
+    // Clear any pending retry timeouts if manual connect is called
+    if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+
+    setStatus(s => ({ 
+        ...s, 
+        isConnecting: !s.isReconnecting, // Only show connecting if not reconnecting
+        error: s.isReconnecting ? s.error : undefined 
+    }));
+
+    isIntentionalDisconnectRef.current = false;
+
     try {
         if(!process.env.API_KEY) {
             throw new Error("API_KEY not found in environment");
@@ -31,8 +69,9 @@ export const useLiveApi = () => {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       // Setup Audio Contexts - Ensure they are running (fix for Network/Autoplay errors)
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const audioCtx = new AudioContextClass({ sampleRate: 24000 });
+      const inputCtx = new AudioContextClass({ sampleRate: 16000 });
       
       if (audioCtx.state === 'suspended') await audioCtx.resume();
       if (inputCtx.state === 'suspended') await inputCtx.resume();
@@ -59,10 +98,45 @@ export const useLiveApi = () => {
       const voiceStyle = localStorage.getItem('eburon_voice_style') || 'Dutch Flemish expressive';
       const language = localStorage.getItem('eburon_language') || 'English';
 
+      // Dynamic Expression Injection
+      let expressionContent = "";
+      
+      if (voiceStyle.includes('Flemish') || voiceStyle.includes('Dutch') || language.includes('Dutch')) {
+          expressionContent = FLEMISH_EXPRESSIONS_CONTENT;
+      } else if (voiceStyle.includes('Tagalog') || language.includes('Filipino') || language.includes('Tagalog')) {
+          expressionContent = TAGALOG_EXPRESSIONS_CONTENT;
+      } else if (voiceStyle.includes('Turkish') || language.includes('Turkish')) {
+          expressionContent = TURKISH_EXPRESSIONS_CONTENT;
+      } else if (voiceStyle.includes('Arabic') || language.includes('Arabic')) {
+          expressionContent = ARABIC_EXPRESSIONS_CONTENT;
+      } else if (voiceStyle.includes('French') || language.includes('French')) {
+          expressionContent = FRENCH_EXPRESSIONS_CONTENT;
+      } else if (voiceStyle.includes('Malayalam') || language.includes('Malayalam')) {
+          expressionContent = MALAYALAM_EXPRESSIONS_CONTENT;
+      } else if (voiceStyle.includes('Spanish') || language.includes('Spanish')) {
+          expressionContent = SPANISH_EXPRESSIONS_CONTENT;
+      } else if (voiceStyle.includes('German') || language.includes('German')) {
+          expressionContent = GERMAN_EXPRESSIONS_CONTENT;
+      } else if (voiceStyle.includes('Hindi') || language.includes('Hindi')) {
+          expressionContent = HINDI_EXPRESSIONS_CONTENT;
+      } else if (voiceStyle.includes('Japanese') || language.includes('Japanese')) {
+          expressionContent = JAPANESE_EXPRESSIONS_CONTENT;
+      } else if (voiceStyle.includes('Korean') || language.includes('Korean')) {
+          expressionContent = KOREAN_EXPRESSIONS_CONTENT;
+      } else if (voiceStyle.includes('Italian') || language.includes('Italian')) {
+          expressionContent = ITALIAN_EXPRESSIONS_CONTENT;
+      } else if (voiceStyle.includes('Russian') || language.includes('Russian')) {
+          expressionContent = RUSSIAN_EXPRESSIONS_CONTENT;
+      }
+
+      if (expressionContent) {
+          systemInstruction += "\n\n" + expressionContent;
+      }
+
       systemInstruction += `\n\n*** VOICE IDENTITY & LANGUAGE PROTOCOL (CRITICAL) ***
       1. VOICE STYLE/ACCENT: You must strictly adopt a "${voiceStyle}" accent, tone, and persona. 
          - Even if speaking English, you must sound like a native speaker of that region speaking English.
-         - Use culturally relevant mannerisms or interjections if they fit the style (e.g., "Allee" for Flemish, "Lah" for Taglish) but keep them subtle.
+         - Use culturally relevant mannerisms or interjections if they fit the style (e.g., "Allee" for Flemish, "Lah" for Taglish, "Yani" for Arabic) but keep them subtle.
       2. OUTPUT LANGUAGE: You must speak in "${language}".
          - Example: If Style is "Dutch Flemish" and Language is "English", speak English with a heavy Flemish accent.
          - Example: If Style is "Turkish" and Language is "Turkish", speak natural Turkish.
@@ -80,12 +154,22 @@ export const useLiveApi = () => {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } }, // Charon for authoritative tone
           },
-          systemInstruction: systemInstruction,
-          inputAudioTranscription: {}, 
+          systemInstruction: { parts: [{ text: systemInstruction }] },
+          inputAudioTranscription: {}, // Enabled for stop/start logic - Removed invalid model param
         },
         callbacks: {
           onopen: () => {
-            setStatus(s => ({ ...s, isConnected: true, isListening: true, error: undefined }));
+            setStatus(s => ({ 
+                ...s, 
+                isConnected: true, 
+                isConnecting: false, 
+                isReconnecting: false, 
+                isListening: true, 
+                error: undefined 
+            }));
+            
+            // Reset retry count on successful connection
+            reconnectAttemptRef.current = 0;
             
             // Setup Input Processing
             if (!inputAudioContextRef.current) return;
@@ -104,7 +188,11 @@ export const useLiveApi = () => {
 
               const pcmBlob = createPcmBlob(inputData);
               sessionPromise.then(session => {
-                session.sendRealtimeInput({ media: pcmBlob });
+                try {
+                    session.sendRealtimeInput({ media: pcmBlob });
+                } catch (e) {
+                    // Ignore send errors if session is closed/closing
+                }
               });
             };
 
@@ -116,18 +204,25 @@ export const useLiveApi = () => {
 
             // IMMEDIATE START TRIGGER
             // Send a text command to kickstart the agent immediately after connection.
-            sessionPromise.then(session => {
-                // Cast to any to handle missing type definition for send method
-                const s = session as any;
-                if (typeof s.send === 'function') {
-                    s.send({
-                        clientContent: {
-                            turns: [{ role: 'user', parts: [{ text: "Start the presentation now. Follow the 8-minute structure, ensuring you cover all key points, and always end with a strong recap and conclusion." }] }],
-                            turnComplete: true
+            // Use setTimeout to ensure the socket is ready.
+            setTimeout(() => {
+                sessionPromise.then(session => {
+                    // Cast to any to handle missing type definition for send method
+                    const s = session as any;
+                    if (typeof s.send === 'function') {
+                        try {
+                            s.send({
+                                clientContent: {
+                                    turns: [{ role: 'user', parts: [{ text: "START BROADCAST NOW. Begin the 8-minute presentation immediately. Speak continuously. Do not stop. If you must pause, use a filler sound, then continue. Go." }] }],
+                                    turnComplete: true
+                                }
+                            });
+                        } catch (e) {
+                            console.warn("Failed to send start trigger", e);
                         }
-                    });
-                }
-            });
+                    }
+                }).catch(() => {});
+            }, 500);
           },
           onmessage: async (msg: LiveServerMessage) => {
             if (msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data) {
@@ -174,29 +269,99 @@ export const useLiveApi = () => {
             }
           },
           onclose: () => {
-            setStatus(s => ({ ...s, isConnected: false, isListening: false }));
+            setStatus(s => ({ ...s, isConnected: false, isConnecting: false, isListening: false }));
+            sessionRef.current = null;
+            
+            // Attempt Reconnect if not intentional
+            if (!isIntentionalDisconnectRef.current) {
+                attemptReconnect();
+            }
           },
           onerror: (e) => {
             console.error("Live API Error", e);
-            setStatus(s => ({ ...s, error: "Network/Connection Error. Please retry." }));
+            setStatus(s => ({ ...s, isConnected: false, isConnecting: false, isListening: false }));
+            sessionRef.current = null;
+            
+            // Stop local streams on error
+            if (sourceRef.current) sourceRef.current.disconnect();
+            if (processorRef.current) processorRef.current.disconnect();
+            if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+
+            // Attempt Reconnect if not intentional
+            if (!isIntentionalDisconnectRef.current) {
+                attemptReconnect();
+            }
           }
         }
       });
 
       sessionRef.current = sessionPromise;
+      sessionPromise.catch(err => {
+          console.error("Session failed to initialize", err);
+          sessionRef.current = null;
+          if (!isIntentionalDisconnectRef.current) {
+             // Very specific connection errors might be retryable
+             attemptReconnect();
+          } else {
+             setStatus(s => ({ ...s, isConnected: false, isConnecting: false, error: "Connection Failed. " + (err.message || "") }));
+          }
+      });
 
     } catch (error: any) {
       console.error("Failed to connect", error);
-      setStatus(s => ({ ...s, error: error.message }));
+      setStatus(s => ({ ...s, isConnecting: false, error: error.message }));
+      sessionRef.current = null;
+      if (!isIntentionalDisconnectRef.current) {
+          attemptReconnect();
+      }
     }
   }, []);
 
+  // Helper to allow recursive calls via ref
+  useEffect(() => {
+      connectRef.current = connect;
+  }, [connect]);
+
+  const attemptReconnect = () => {
+      if (reconnectAttemptRef.current < MAX_RETRIES) {
+          reconnectAttemptRef.current += 1;
+          const delay = Math.min(1000 * (2 ** (reconnectAttemptRef.current - 1)), 5000); // Exponential backoff: 1s, 2s, 4s
+          
+          console.log(`Attempting reconnect ${reconnectAttemptRef.current}/${MAX_RETRIES} in ${delay}ms`);
+          
+          setStatus(s => ({ 
+              ...s, 
+              isReconnecting: true, 
+              error: `Connection lost. Retrying (${reconnectAttemptRef.current}/${MAX_RETRIES})...` 
+          }));
+          
+          if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+          
+          retryTimeoutRef.current = setTimeout(() => {
+              if (connectRef.current) connectRef.current();
+          }, delay);
+      } else {
+          setStatus(s => ({ 
+              ...s, 
+              isReconnecting: false, 
+              error: "Connection failed after multiple attempts. Please check your network and try again." 
+          }));
+          reconnectAttemptRef.current = 0;
+      }
+  };
+
   const disconnect = useCallback(() => {
+    isIntentionalDisconnectRef.current = true;
+    if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+    reconnectAttemptRef.current = 0;
+
     if (sessionRef.current) {
       sessionRef.current.then((session: any) => {
           if(session.close) session.close();
       }).catch(() => {}); // Ignore close errors
     }
+    
+    sessionRef.current = null;
     
     if (sourceRef.current) sourceRef.current.disconnect();
     if (processorRef.current) processorRef.current.disconnect();
@@ -206,6 +371,8 @@ export const useLiveApi = () => {
 
     setStatus({
       isConnected: false,
+      isConnecting: false,
+      isReconnecting: false,
       isSpeaking: false,
       isListening: false,
       volume: 0
@@ -217,17 +384,19 @@ export const useLiveApi = () => {
       if (sessionRef.current) {
           sessionRef.current.then((session: any) => {
               // Safely check if send method exists before calling
-              // This prevents "session.send is not a function" errors on incompatible SDK versions
               if (typeof session.send === 'function') {
-                  session.send({ 
-                      clientContent: { 
-                          turns: [{ role: 'user', parts: [{ text }] }], 
-                          turnComplete: true 
-                      } 
-                  });
+                  try {
+                      session.send({ 
+                          clientContent: { 
+                              turns: [{ role: 'user', parts: [{ text }] }], 
+                              turnComplete: true 
+                          } 
+                      });
+                  } catch (e) {
+                      console.warn("Failed to send text", e);
+                  }
               }
-              // If session.send is not available, we silently ignore the request to avoid crashing the app.
-          });
+          }).catch(() => {});
       }
   }, []);
 

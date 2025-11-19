@@ -14,15 +14,48 @@ const App: React.FC = () => {
     <div className="flex flex-col h-screen bg-black overflow-hidden font-sans">
       {/* Viewport Area */}
       <div className="flex-1 overflow-hidden relative">
-        {mode === AppMode.LIVE_AGENT && <LiveAgent />}
-        {mode === AppMode.CHAT && <ChatInterface />}
-        {mode === AppMode.THINKING && <ThinkingMode />}
-        {mode === AppMode.TRANSCRIBE && <Transcriber />}
-        {mode === AppMode.SETTINGS && <Settings />}
+        {/* 
+            PERSISTENCE LAYER:
+            LiveAgent remains mounted to keep the connection/audio session alive.
+            We use CSS opacity and pointer-events to hide it without unmounting,
+            ensuring the explanation continues in the background during navigation.
+        */}
+        <div className={`absolute inset-0 w-full h-full transition-opacity duration-300 ${mode === AppMode.LIVE_AGENT ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'}`}>
+             <LiveAgent />
+        </div>
+
+        {/* 
+            OVERLAY LAYERS:
+            These components are mounted on demand (or could be persistent) and overlay the agent.
+            We give them a solid background to cover the agent layer when active.
+        */}
+        {mode === AppMode.CHAT && (
+            <div className="absolute inset-0 z-20 bg-black">
+                <ChatInterface />
+            </div>
+        )}
+        
+        {mode === AppMode.THINKING && (
+            <div className="absolute inset-0 z-20 bg-black">
+                <ThinkingMode />
+            </div>
+        )}
+        
+        {mode === AppMode.TRANSCRIBE && (
+             <div className="absolute inset-0 z-20 bg-black">
+                <Transcriber />
+            </div>
+        )}
+        
+        {mode === AppMode.SETTINGS && (
+             <div className="absolute inset-0 z-20 bg-black">
+                <Settings />
+            </div>
+        )}
       </div>
 
       {/* Bottom Navigation - Mobile First */}
-      <div className="h-20 bg-zinc-950 border-t border-zinc-800 grid grid-cols-5 px-2 z-50">
+      <div className="h-20 bg-zinc-950 border-t border-zinc-800 grid grid-cols-5 px-2 z-50 relative">
         <NavButton 
             active={mode === AppMode.LIVE_AGENT} 
             onClick={() => setMode(AppMode.LIVE_AGENT)} 

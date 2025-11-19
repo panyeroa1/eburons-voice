@@ -24,6 +24,8 @@ export interface GroundingSource {
 
 export interface LiveStatus {
   isConnected: boolean;
+  isConnecting: boolean;
+  isReconnecting: boolean;
   isSpeaking: boolean;
   isListening: boolean;
   volume: number;
