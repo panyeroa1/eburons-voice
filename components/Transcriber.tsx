@@ -1,13 +1,15 @@
 
 import React, { useState, useRef } from 'react';
-import { GoogleGenAI, Modality } from '@google/genai';
-import { Mic, StopCircle, FileText, Loader2 } from 'lucide-react';
+import { GoogleGenAI } from '@google/genai';
+import { Mic, StopCircle, FileText, Loader2, UploadCloud, Check } from 'lucide-react';
 import { arrayBufferToBase64 } from '../utils/audioUtils';
+import { supabase, getSessionId } from '../utils/supabaseClient';
 
 const Transcriber: React.FC = () => {
     const [isRecording, setIsRecording] = useState(false);
     const [transcription, setTranscription] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
     
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
@@ -26,6 +28,7 @@ const Transcriber: React.FC = () => {
             recorder.start();
             setIsRecording(true);
             setTranscription('');
+            setUploadStatus('idle');
             mediaRecorderRef.current = recorder;
         } catch (e) {
             console.error("Mic error", e);
@@ -44,26 +47,54 @@ const Transcriber: React.FC = () => {
     const processAudio = async () => {
         setIsProcessing(true);
         try {
-            const blob = new Blob(chunksRef.current, { type: 'audio/webm' }); // Or default audio type
-            const buffer = await blob.arrayBuffer();
+            const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+            const buffer = await audioBlob.arrayBuffer();
             const base64 = arrayBufferToBase64(buffer);
 
+            // 1. Transcribe with Gemini
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-            
-            // Using standard generateContent with audio input for transcription
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: {
                     parts: [
-                        { inlineData: { mimeType: 'audio/webm', data: base64 } }, // Use correct mimeType from recorder
+                        { inlineData: { mimeType: 'audio/webm', data: base64 } },
                         { text: "Please transcribe this audio exactly as spoken." }
                     ]
                 }
             });
             
-            setTranscription(response.text || "No text found.");
+            const text = response.text || "No text found.";
+            setTranscription(text);
+
+            // 2. Upload to Supabase Storage
+            setUploadStatus('uploading');
+            const sessionId = getSessionId();
+            const fileName = `${sessionId}/${Date.now()}.webm`;
+            
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('recordings')
+                .upload(fileName, audioBlob);
+
+            if (uploadError) {
+                console.error("Upload failed", uploadError);
+                setUploadStatus('error');
+            } else {
+                // 3. Save Metadata to DB
+                const { data: publicUrlData } = supabase.storage.from('recordings').getPublicUrl(fileName);
+                
+                await supabase.from('transcriptions').insert({
+                    session_id: sessionId,
+                    audio_url: publicUrlData.publicUrl,
+                    transcript: text,
+                    created_at: new Date().toISOString()
+                });
+
+                setUploadStatus('done');
+            }
+
         } catch (e: any) {
             setTranscription(`Error: ${e.message}`);
+            setUploadStatus('error');
         } finally {
             setIsProcessing(false);
         }
@@ -107,9 +138,14 @@ const Transcriber: React.FC = () => {
 
                 {transcription && (
                     <div className="bg-zinc-900/80 backdrop-blur-md rounded-xl p-6 text-left border border-zinc-800 w-full shadow-lg">
-                        <div className="flex items-center gap-2 mb-4 text-amber-500 font-mono text-xs uppercase">
-                            <FileText className="w-4 h-4" />
-                            Transcript
+                        <div className="flex items-center justify-between mb-4">
+                             <div className="flex items-center gap-2 text-amber-500 font-mono text-xs uppercase">
+                                <FileText className="w-4 h-4" />
+                                Transcript
+                            </div>
+                            {uploadStatus === 'uploading' && <div className="flex items-center gap-1 text-zinc-500 text-[10px]"><Loader2 className="w-3 h-3 animate-spin" /> Uploading...</div>}
+                            {uploadStatus === 'done' && <div className="flex items-center gap-1 text-green-500 text-[10px]"><Check className="w-3 h-3" /> Saved to Cloud</div>}
+                            {uploadStatus === 'error' && <div className="flex items-center gap-1 text-red-500 text-[10px]">Upload Failed</div>}
                         </div>
                         <p className="text-sm leading-relaxed text-zinc-300">{transcription}</p>
                     </div>

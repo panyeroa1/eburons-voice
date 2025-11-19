@@ -1,47 +1,90 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, Type } from '@google/genai';
-import { Send, Loader2, Globe, Sparkles, MapPin, Trash2 } from 'lucide-react';
+import { GoogleGenAI } from '@google/genai';
+import { Send, Loader2, Globe, Sparkles, MapPin, Trash2, Cloud } from 'lucide-react';
 import { Message, GroundingSource } from '../types';
 import { GENERAL_SYSTEM_INSTRUCTION } from '../constants';
+import { supabase, getSessionId } from '../utils/supabaseClient';
 
 const ChatInterface: React.FC = () => {
   const [input, setInput] = useState('');
-  
-  // Initialize state from localStorage with safe parsing
-  const [messages, setMessages] = useState<Message[]>(() => {
-    try {
-        const saved = localStorage.getItem('eburon_chat_history');
-        return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-        console.error('Failed to load chat history', e);
-        return [];
-    }
-  });
-
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [useSearch, setUseSearch] = useState(true);
   const [useMaps, setUseMaps] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Save to localStorage whenever messages change
+  // Load history from Supabase on mount
   useEffect(() => {
-    try {
-      localStorage.setItem('eburon_chat_history', JSON.stringify(messages));
-    } catch (e) {
-      console.error('Failed to save chat history', e);
-    }
-  }, [messages]);
+    const fetchHistory = async () => {
+      const sessionId = getSessionId();
+      try {
+        const { data, error } = await supabase
+          .from('chat_history')
+          .select('*')
+          .eq('session_id', sessionId)
+          .order('timestamp', { ascending: true });
 
+        if (data && !error) {
+          const loadedMessages: Message[] = data.map((row: any) => ({
+            role: row.role,
+            text: row.text,
+            timestamp: row.timestamp,
+            sources: row.sources
+          }));
+          setMessages(loadedMessages);
+        } else {
+             // Fallback to localstorage if DB empty or error
+            const saved = localStorage.getItem('eburon_chat_history');
+            if (saved) setMessages(JSON.parse(saved));
+        }
+      } catch (e) {
+        console.warn("Failed to fetch chat history from DB", e);
+        const saved = localStorage.getItem('eburon_chat_history');
+        if (saved) setMessages(JSON.parse(saved));
+      } finally {
+        setIsHistoryLoading(false);
+      }
+    };
+    fetchHistory();
+  }, []);
+
+  // Auto-scroll effect
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
-  const clearHistory = () => {
+  const saveMessageToDb = async (msg: Message) => {
+      const sessionId = getSessionId();
+      try {
+          await supabase.from('chat_history').insert({
+              session_id: sessionId,
+              role: msg.role,
+              text: msg.text,
+              timestamp: msg.timestamp,
+              sources: msg.sources,
+              created_at: new Date().toISOString()
+          });
+      } catch (e) {
+          console.warn("Failed to save message to DB", e);
+      }
+      
+      // Always save to local as backup
+      localStorage.setItem('eburon_chat_history', JSON.stringify([...messages, msg]));
+  };
+
+  const clearHistory = async () => {
+    const sessionId = getSessionId();
     setMessages([]);
     localStorage.removeItem('eburon_chat_history');
+    try {
+        await supabase.from('chat_history').delete().eq('session_id', sessionId);
+    } catch(e) {
+        console.warn("Failed to clear DB history", e);
+    }
   };
 
   const handleSend = async () => {
@@ -52,9 +95,13 @@ const ChatInterface: React.FC = () => {
     }
 
     const userMsg: Message = { role: 'user', text: input, timestamp: Date.now() };
-    setMessages(prev => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setInput('');
     setIsLoading(true);
+
+    // Fire and forget save
+    saveMessageToDb(userMsg);
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -87,19 +134,24 @@ const ChatInterface: React.FC = () => {
           });
       }
 
-      setMessages(prev => [...prev, {
+      const modelMsg: Message = {
           role: 'model',
           text,
           timestamp: Date.now(),
           sources: sources.length > 0 ? sources : undefined
-      }]);
+      };
+
+      setMessages(prev => [...prev, modelMsg]);
+      saveMessageToDb(modelMsg);
 
     } catch (e: any) {
-      setMessages(prev => [...prev, {
+      const errorMsg: Message = {
           role: 'system',
           text: `Error: ${e.message}`,
           timestamp: Date.now()
-      }]);
+      };
+      setMessages(prev => [...prev, errorMsg]);
+      saveMessageToDb(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -148,7 +200,12 @@ const ChatInterface: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10" ref={scrollRef}>
-        {messages.length === 0 && (
+        {isHistoryLoading && (
+             <div className="flex justify-center py-10">
+                 <Loader2 className="w-6 h-6 animate-spin text-zinc-600" />
+             </div>
+        )}
+        {!isHistoryLoading && messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-zinc-600 opacity-50">
                 <Sparkles className="w-12 h-12 mb-4" />
                 <p>EBURON ready. Toggle Search/Maps for grounded data.</p>

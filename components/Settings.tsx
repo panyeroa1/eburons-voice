@@ -1,33 +1,101 @@
 
-import React, { useState } from 'react';
-import { Settings as SettingsIcon, ChevronDown, FileText, CheckCircle, Mic, Globe, Save } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings as SettingsIcon, ChevronDown, FileText, CheckCircle, Mic, Globe, Save, Cloud, AlertCircle, Loader2 } from 'lucide-react';
+import { supabase, getSessionId } from '../utils/supabaseClient';
 
 const Settings: React.FC = () => {
-  const [topic, setTopic] = useState<string>(() => {
-      return localStorage.getItem('eburon_topic') || 'Trafficking Early Warning System';
-  });
-
-  const [voiceStyle, setVoiceStyle] = useState<string>(() => {
-      return localStorage.getItem('eburon_voice_style') || 'Dutch Flemish expressive';
-  });
-
-  const [language, setLanguage] = useState<string>(() => {
-      return localStorage.getItem('eburon_language') || 'English';
-  });
+  const [topic, setTopic] = useState<string>('Trafficking Early Warning System');
+  const [voiceStyle, setVoiceStyle] = useState<string>('Dutch Flemish expressive');
+  const [language, setLanguage] = useState<string>('English');
 
   const [isSaved, setIsSaved] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
-  const handleSave = () => {
+  // Load initial settings from LocalStorage then try Supabase
+  useEffect(() => {
+      const localTopic = localStorage.getItem('eburon_topic');
+      const localVoice = localStorage.getItem('eburon_voice_style');
+      const localLang = localStorage.getItem('eburon_language');
+
+      if (localTopic) setTopic(localTopic);
+      if (localVoice) setVoiceStyle(localVoice);
+      if (localLang) setLanguage(localLang);
+
+      fetchSettingsFromSupabase();
+  }, []);
+
+  const fetchSettingsFromSupabase = async () => {
+      setIsSyncing(true);
+      const sessionId = getSessionId();
+      try {
+          const { data, error } = await supabase
+              .from('settings')
+              .select('*')
+              .eq('session_id', sessionId)
+              .single();
+          
+          if (data && !error) {
+              if (data.topic) {
+                  setTopic(data.topic);
+                  localStorage.setItem('eburon_topic', data.topic);
+              }
+              if (data.voice_style) {
+                  setVoiceStyle(data.voice_style);
+                  localStorage.setItem('eburon_voice_style', data.voice_style);
+              }
+              if (data.language) {
+                  setLanguage(data.language);
+                  localStorage.setItem('eburon_language', data.language);
+              }
+              // Notify app of updates
+              window.dispatchEvent(new Event('eburon_config_updated'));
+          }
+      } catch (err) {
+          console.warn("Supabase sync skipped or failed (using local):", err);
+      } finally {
+          setIsSyncing(false);
+      }
+  };
+
+  const handleSave = async () => {
+      setSyncError(null);
+      setIsSyncing(true);
+
+      // 1. Save Local
       localStorage.setItem('eburon_topic', topic);
       localStorage.setItem('eburon_voice_style', voiceStyle);
       localStorage.setItem('eburon_language', language);
       
-      // Dispatch event to notify LiveAgent to update its display immediately
+      // Dispatch event to notify LiveAgent
       window.dispatchEvent(new Event('eburon_config_updated'));
 
-      setIsSaved(true);
-      // Hide message after 3 seconds
-      setTimeout(() => setIsSaved(false), 3000);
+      // 2. Save to Supabase
+      const sessionId = getSessionId();
+      try {
+          const { error } = await supabase
+              .from('settings')
+              .upsert({ 
+                  session_id: sessionId, 
+                  topic, 
+                  voice_style: voiceStyle, 
+                  language,
+                  updated_at: new Date().toISOString()
+              }, { onConflict: 'session_id' });
+          
+          if (error) throw error;
+          
+          setIsSaved(true);
+          setTimeout(() => setIsSaved(false), 3000);
+      } catch (err: any) {
+          console.error("Failed to save to Cloud DB:", err);
+          setSyncError("Saved locally, but Cloud sync failed.");
+          // Still show saved state because local worked
+          setIsSaved(true);
+          setTimeout(() => setIsSaved(false), 3000);
+      } finally {
+          setIsSyncing(false);
+      }
   };
 
   const voiceStyles = [
@@ -36,7 +104,14 @@ const Settings: React.FC = () => {
     "Turkish Local Language",
     "Arabic Accent UAE National",
     "French Grown Native Speaking",
-    "Malayalam Indian Native"
+    "Malayalam Indian Native",
+    "Spanish Mexican Passionate",
+    "German Professional Direct",
+    "Hindi English Hybrid",
+    "Japanese Business Formal",
+    "Korean Modern Seoul",
+    "Italian Expressive Gesture",
+    "Russian Direct Tech"
   ];
 
   const languages = [
@@ -80,11 +155,26 @@ const Settings: React.FC = () => {
 
       {/* Header */}
       <div className="p-6 border-b border-zinc-800/50 bg-zinc-900/50 backdrop-blur-md z-10">
-        <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-          <SettingsIcon className="w-6 h-6 text-amber-500" />
-          System Configuration
-        </h2>
-        <p className="text-xs text-zinc-400 mt-1 font-mono">KNOWLEDGE BASE & VOICE PARAMETERS</p>
+        <div className="flex justify-between items-start">
+            <div>
+                <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                <SettingsIcon className="w-6 h-6 text-amber-500" />
+                System Configuration
+                </h2>
+                <p className="text-xs text-zinc-400 mt-1 font-mono">KNOWLEDGE BASE & VOICE PARAMETERS</p>
+            </div>
+            <div className="flex items-center gap-2">
+                {isSyncing ? (
+                    <div className="flex items-center gap-1 text-[10px] font-mono text-zinc-500">
+                        <Loader2 className="w-3 h-3 animate-spin" /> SYNCING DB
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-1 text-[10px] font-mono text-zinc-600">
+                         <Cloud className="w-3 h-3" /> DB READY
+                    </div>
+                )}
+            </div>
+        </div>
       </div>
 
       {/* Content */}
@@ -172,16 +262,24 @@ const Settings: React.FC = () => {
           <div className="pt-6 flex flex-col items-center gap-4 border-t border-zinc-800/50 mt-8">
             <button 
                 onClick={handleSave}
-                className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-8 py-3 rounded-lg font-medium transition-all shadow-lg hover:shadow-amber-500/20 active:scale-95"
+                disabled={isSyncing}
+                className="flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-white px-8 py-3 rounded-lg font-medium transition-all shadow-lg hover:shadow-amber-500/20 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-                <Save className="w-4 h-4" />
-                Save Configuration
+                {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {isSyncing ? 'Syncing...' : 'Save Configuration'}
             </button>
 
-            {isSaved && (
+            {syncError && (
+                <div className="flex items-center gap-2 text-amber-400 bg-amber-900/20 px-4 py-2 rounded-full border border-amber-900/50 animate-in fade-in">
+                    <AlertCircle className="w-4 h-4" />
+                    <span className="text-sm font-medium">{syncError}</span>
+                </div>
+            )}
+
+            {isSaved && !syncError && (
                 <div className="flex items-center gap-2 text-green-400 bg-green-900/20 px-4 py-2 rounded-full border border-green-900/50 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <CheckCircle className="w-4 h-4" />
-                    <span className="text-sm font-medium">System configuration updated successfully.</span>
+                    <span className="text-sm font-medium">System configuration saved & synced.</span>
                 </div>
             )}
           </div>
@@ -193,4 +291,3 @@ const Settings: React.FC = () => {
 };
 
 export default Settings;
-    
