@@ -1,13 +1,14 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, ChevronDown, FileText, CheckCircle, Mic, Globe, Save, Cloud, AlertCircle, Loader2 } from 'lucide-react';
+import { Settings as SettingsIcon, ChevronDown, FileText, CheckCircle, Mic, Globe, Save, Cloud, AlertCircle, Loader2, Volume2 } from 'lucide-react';
 import { supabase, getSessionId } from '../utils/supabaseClient';
 
 const Settings: React.FC = () => {
-  const [topic, setTopic] = useState<string>('Trafficking Early Warning System');
+  const [topic, setTopic] = useState<string>('Eburon Aegis Vision');
   const [voiceStyle, setVoiceStyle] = useState<string>('Dutch Flemish expressive');
   const [language, setLanguage] = useState<string>('English');
+  const [voiceName, setVoiceName] = useState<string>('Orus');
 
   const [isSaved, setIsSaved] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -16,12 +17,14 @@ const Settings: React.FC = () => {
   // Load initial settings from LocalStorage then try Supabase
   useEffect(() => {
       const localTopic = localStorage.getItem('eburon_topic');
-      const localVoice = localStorage.getItem('eburon_voice_style');
+      const localVoiceStyle = localStorage.getItem('eburon_voice_style');
       const localLang = localStorage.getItem('eburon_language');
+      const localVoiceName = localStorage.getItem('eburon_voice_name');
 
       if (localTopic) setTopic(localTopic);
-      if (localVoice) setVoiceStyle(localVoice);
+      if (localVoiceStyle) setVoiceStyle(localVoiceStyle);
       if (localLang) setLanguage(localLang);
+      if (localVoiceName) setVoiceName(localVoiceName);
 
       fetchSettingsFromSupabase();
   }, []);
@@ -49,11 +52,10 @@ const Settings: React.FC = () => {
                   setLanguage(data.language);
                   localStorage.setItem('eburon_language', data.language);
               }
-              // Notify app of updates
+              // Note: voice_name is currently local-only to avoid schema migrations
               window.dispatchEvent(new Event('eburon_config_updated'));
           }
       } catch (err) {
-          // Silent fail on fetch is acceptable as we fallback to local
           console.warn("Supabase sync skipped or failed (using local)", err);
       } finally {
           setIsSyncing(false);
@@ -68,6 +70,7 @@ const Settings: React.FC = () => {
       localStorage.setItem('eburon_topic', topic);
       localStorage.setItem('eburon_voice_style', voiceStyle);
       localStorage.setItem('eburon_language', language);
+      localStorage.setItem('eburon_voice_name', voiceName);
       
       // Dispatch event to notify LiveAgent
       window.dispatchEvent(new Event('eburon_config_updated'));
@@ -75,6 +78,7 @@ const Settings: React.FC = () => {
       // 2. Save to Supabase
       const sessionId = getSessionId();
       try {
+          // We omit voice_name from Supabase upsert to prevent errors if column doesn't exist
           const { error } = await supabase
               .from('settings')
               .upsert({ 
@@ -90,22 +94,15 @@ const Settings: React.FC = () => {
           setIsSaved(true);
           setTimeout(() => setIsSaved(false), 3000);
       } catch (err: any) {
-          // Safely stringify error to avoid [object Object]
           let errorMsg = "Unknown error";
           if (typeof err === 'string') errorMsg = err;
           else if (err?.message) errorMsg = err.message;
-          else if (err?.details) errorMsg = err.details;
           else {
-              try {
-                  errorMsg = JSON.stringify(err);
-              } catch (e) {
-                  errorMsg = "Unserializable Error Object";
-              }
+              try { errorMsg = JSON.stringify(err); } catch (e) { errorMsg = "Unserializable Error"; }
           }
 
           console.error("Failed to save to Cloud DB:", err);
           setSyncError(`Saved locally. Cloud sync error: ${errorMsg.substring(0, 50)}...`);
-          // Still show saved state because local worked
           setIsSaved(true);
           setTimeout(() => setIsSaved(false), 4000);
       } finally {
@@ -129,6 +126,8 @@ const Settings: React.FC = () => {
     "Italian Expressive Gesture",
     "Russian Direct Tech"
   ];
+
+  const voices = ["Orus", "Puck", "Charon", "Kore", "Fenrir", "Aoede", "Zephyr"];
 
   const languages = [
     "Afrikaans", "Albanian", "Amharic", "Arabic", "Armenian", "Assamese", "Aymara", "Azerbaijani", 
@@ -215,9 +214,9 @@ const Settings: React.FC = () => {
                 onChange={(e) => setTopic(e.target.value)}
                 className="w-full bg-black/50 border border-zinc-700 rounded-lg p-4 appearance-none focus:border-amber-500 outline-none text-white font-mono text-sm transition-colors cursor-pointer group-hover:border-zinc-600"
               >
-                <option value="Trafficking Early Warning System">Trafficking Early Warning System</option>
-                <option value="Decobu Messenger">Decobu Messenger Security</option>
+                <option value="Eburon Aegis Vision">Eburon Aegis Vision Security</option>
                 <option value="Eburon Flyer">Eburon Flyer Project</option>
+                <option value="Decobu Messenger">Decobu Messenger Security</option>
                 <option value="Eburon Architecture" disabled>Eburon Architecture (Coming Soon)</option>
                 <option value="Voice Synthesis" disabled>Voice Synthesis Protocols (Coming Soon)</option>
               </select>
@@ -225,12 +224,38 @@ const Settings: React.FC = () => {
             </div>
           </div>
 
-          {/* Voice Persona */}
+          {/* Voice Model Selector */}
+          <div className="bg-zinc-900/80 backdrop-blur-sm rounded-xl border border-zinc-800 p-6 space-y-4 shadow-lg">
+            <div className="flex items-center justify-between">
+                <label className="text-sm text-zinc-400 font-medium uppercase tracking-wider flex items-center gap-2">
+                  <Volume2 className="w-4 h-4" />
+                  Base Voice Model
+                </label>
+                <span className="text-[10px] bg-zinc-800 text-zinc-400 px-2 py-1 rounded border border-zinc-700">
+                    DEFAULT: ORUS
+                </span>
+            </div>
+            
+            <div className="relative group">
+              <select 
+                value={voiceName}
+                onChange={(e) => setVoiceName(e.target.value)}
+                className="w-full bg-black/50 border border-zinc-700 rounded-lg p-4 appearance-none focus:border-amber-500 outline-none text-white font-mono text-sm transition-colors cursor-pointer group-hover:border-zinc-600"
+              >
+                {voices.map(voice => (
+                    <option key={voice} value={voice}>{voice} {voice === 'Orus' ? '(System Default)' : ''}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Voice Style */}
           <div className="bg-zinc-900/80 backdrop-blur-sm rounded-xl border border-zinc-800 p-6 space-y-4 shadow-lg">
             <div className="flex items-center justify-between">
                 <label className="text-sm text-zinc-400 font-medium uppercase tracking-wider flex items-center gap-2">
                   <Mic className="w-4 h-4" />
-                  Voice Style & Tone
+                  Accent & Mannerisms
                 </label>
             </div>
             
@@ -246,7 +271,6 @@ const Settings: React.FC = () => {
               </select>
               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none" />
             </div>
-            <p className="text-xs text-zinc-500 px-1">Determines the accent, intonation, and cultural mannerisms of the voice.</p>
           </div>
 
           {/* Language */}
@@ -254,7 +278,7 @@ const Settings: React.FC = () => {
             <div className="flex items-center justify-between">
                 <label className="text-sm text-zinc-400 font-medium uppercase tracking-wider flex items-center gap-2">
                   <Globe className="w-4 h-4" />
-                  Spoken Language
+                  Output Language
                 </label>
             </div>
             
@@ -270,9 +294,6 @@ const Settings: React.FC = () => {
               </select>
               <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none" />
             </div>
-             <p className="text-xs text-zinc-500 px-1">
-                <span className="text-amber-600">Note:</span> If Language differs from Voice Style, the agent will speak this language with the selected accent.
-            </p>
           </div>
         </div>
       </div>

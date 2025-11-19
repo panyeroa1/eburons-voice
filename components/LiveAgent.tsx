@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLiveApi } from '../hooks/useLiveApi';
 import AudioVisualizer from './AudioVisualizer';
-import { Mic, PhoneOff, Radio, Loader2, RefreshCw, Settings2 } from 'lucide-react';
+import { Mic, PhoneOff, Radio, Loader2, RefreshCw, Settings2, HelpCircle } from 'lucide-react';
 
 const LiveAgent: React.FC = () => {
   const { connect, disconnect, sendText, status, transcription } = useLiveApi();
@@ -15,14 +15,14 @@ const LiveAgent: React.FC = () => {
 
   // Local state for configuration display
   const [config, setConfig] = useState({
-    topic: 'Trafficking Early Warning System',
+    topic: 'Eburon Aegis Vision',
     language: 'English',
     voiceStyle: 'Dutch Flemish expressive'
   });
 
   const loadConfig = () => {
     setConfig({
-        topic: localStorage.getItem('eburon_topic') || 'Trafficking Early Warning System',
+        topic: localStorage.getItem('eburon_topic') || 'Eburon Aegis Vision',
         language: localStorage.getItem('eburon_language') || 'English',
         voiceStyle: localStorage.getItem('eburon_voice_style') || 'Dutch Flemish expressive'
     });
@@ -128,12 +128,12 @@ const LiveAgent: React.FC = () => {
                 // Check if user has been silent recently (avoid interrupting user)
                 const timeSinceUserActivity = Date.now() - lastUserActivityRef.current;
                 
-                // Only auto-continue if user has been silent for > 1.5 seconds
-                if (timeSinceUserActivity > 1500) {
-                    // Send specific continue prompt as requested by user
-                    sendText("[SYSTEM] IGNORE SILENCE. Keep speaking. Don't stop."); 
+                // Only auto-continue if user has been silent for > 2.0 seconds
+                if (timeSinceUserActivity > 2000) {
+                    // Send strict silent continuation directive
+                    sendText("[SYSTEM] CONTINUATION SIGNAL: The audio stream paused. Resume your speech immediately from where you stopped. Do not acknowledge this interruption."); 
                 }
-            }, 1000); // 1s silence triggers continuation check
+            }, 2000); // 2s silence triggers continuation check
         }
     } else {
         // If finished but not concluding (rare state), ensure no timers
@@ -141,6 +141,25 @@ const LiveAgent: React.FC = () => {
     }
 
   }, [status.isConnected, status.isSpeaking, transcription, sendText, disconnect]);
+
+  const handleAskNow = () => {
+      // Prevent auto-disconnect if triggered near conclusion
+      if (disconnectTimerRef.current) {
+          clearTimeout(disconnectTimerRef.current);
+          disconnectTimerRef.current = null;
+      }
+      
+      // Stop any pending auto-continue prompts
+      if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+      }
+
+      // Reset conclusion state to allow Q&A
+      isFinishedRef.current = false;
+      isConcludingRef.current = false;
+
+      sendText("[SYSTEM INTERRUPT] USER QUESTION PROTOCOL:\n1. Stop your presentation immediately.\n2. Acknowledge the user's question first (e.g. \"That is a valid point regarding...\").\n3. Answer the question in real-time, but STRICTLY within the scope of the current topic. DO NOT invent information. Elaborate on known facts only.\n4. If the question is unclear, ask for clarification.\n5. Ready to listen.");
+  };
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-b from-zinc-900 to-black text-white relative overflow-hidden">
@@ -231,8 +250,18 @@ const LiveAgent: React.FC = () => {
         )}
       </div>
 
-      {/* Controls - Rectangular Buttons */}
-      <div className="p-8 pb-12 z-10 flex justify-center items-center w-full">
+      {/* Controls - Flex Column to stack buttons */}
+      <div className="p-8 pb-12 z-10 flex flex-col gap-3 justify-center items-center w-full">
+         {status.isConnected && (
+             <button 
+                onClick={handleAskNow}
+                className="w-full max-w-sm py-3 rounded-xl font-mono font-bold text-sm tracking-widest transition-all duration-300 shadow-lg flex items-center justify-center gap-3 bg-zinc-800 text-amber-500 border border-amber-500/50 hover:bg-amber-500/10 hover:border-amber-500 active:scale-95 group"
+             >
+                <HelpCircle className="w-5 h-5 group-hover:text-amber-400 transition-colors" />
+                ASK NOW
+             </button>
+         )}
+
          {!status.isConnected ? (
              <button 
                 onClick={connect}

@@ -5,8 +5,8 @@ import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { 
     ORUS_SYSTEM_PROMPT, 
     DECOBU_SECURITY_CONTENT, 
-    TRAFFICKING_SYSTEM_CONTENT, 
     EBURON_FLYER_CONTENT,
+    AEGIS_VISION_CONTENT,
     FLEMISH_EXPRESSIONS_CONTENT,
     TAGALOG_EXPRESSIONS_CONTENT,
     SINGAPORE_EXPRESSIONS_CONTENT,
@@ -133,18 +133,23 @@ export const useLiveApi = () => {
       let systemInstruction = ORUS_SYSTEM_PROMPT;
       
       // 1. Inject Knowledge Topic
-      const selectedTopic = localStorage.getItem('eburon_topic') || 'Trafficking Early Warning System';
+      const selectedTopic = localStorage.getItem('eburon_topic') || 'Eburon Aegis Vision';
       if (selectedTopic === 'Decobu Messenger') {
           systemInstruction += "\n\n" + "CURRENT TOPIC BRIEFING:\n" + DECOBU_SECURITY_CONTENT;
-      } else if (selectedTopic === 'Trafficking Early Warning System') {
-          systemInstruction += "\n\n" + "CURRENT TOPIC BRIEFING:\n" + TRAFFICKING_SYSTEM_CONTENT;
       } else if (selectedTopic === 'Eburon Flyer') {
           systemInstruction += "\n\n" + "CURRENT TOPIC BRIEFING:\n" + EBURON_FLYER_CONTENT;
+      } else if (selectedTopic === 'Eburon Aegis Vision') {
+          systemInstruction += "\n\n" + "CURRENT TOPIC BRIEFING:\n" + AEGIS_VISION_CONTENT;
       }
 
       // 2. Inject Voice Style and Language
       const voiceStyle = localStorage.getItem('eburon_voice_style') || 'Dutch Flemish expressive';
       const language = localStorage.getItem('eburon_language') || 'English';
+      
+      // 3. Resolve Voice Name
+      const selectedVoiceName = localStorage.getItem('eburon_voice_name') || 'Orus';
+      // Map "Orus" (Custom Persona) to "Kore" (Valid API Voice)
+      const apiVoiceName = selectedVoiceName === 'Orus' ? 'Kore' : selectedVoiceName;
 
       // Dynamic Expression Injection: Precisely map settings to expression constants
       let expressionContent = "";
@@ -202,7 +207,7 @@ export const useLiveApi = () => {
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: apiVoiceName } },
           },
           systemInstruction: systemInstruction,
           inputAudioTranscription: {},
