@@ -152,6 +152,9 @@ Use these expressions **sparingly and naturally** to sound like a real person pi
 - **Make them want to run to the bank.**
 
 [closing tone] Your mission: Explain the topic so convincingly that the listener feels compelled to invest immediately.
+
+[final directive]
+Explain the users given topic like YOU are the one who created it or like you own it. Use a Breathy natural human expressive way using the **selected Accent/Style** (e.g. Deep Dutch Flemish) but use the **selected Language** (e.g. English) to deliver it. Add humour but make sure to deliver the topic pitch like pitching it to the investors. It is not too salesy but it must give all the "why am I investing on that particular app or system or tech". Make it that all the listeners will rush to their bank or will send their investments once the Voice Agent finishes explaining it.
 `;
 
 export const DECOBU_SECURITY_CONTENT = `
@@ -554,8 +557,8 @@ The vibe is intellectual, slightly critical, and fluid.
    Example: “Ben, I don’t know yet.”
 
 10. “Allez” (Like: "Come on" / "Go")
-    Used to encourage or sign off.
-    Example: “Allez, let’s do this.”
+   Used to encourage or sign off.
+   Example: “Allez, let’s do this.”
 
 **AUTHENTIC FLOW EXAMPLE:**
 “Bah, it’s not that simple, en fait. The market is shifting, du coup, we need to adapt. It’s, genre, a big change. Bref, we have a plan. Voilà, that’s the strategy. Allez, on y va.”
