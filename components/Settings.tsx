@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, ChevronDown, FileText, CheckCircle, Mic, Globe, Save, Cloud, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase, getSessionId } from '../utils/supabaseClient';
@@ -52,7 +53,8 @@ const Settings: React.FC = () => {
               window.dispatchEvent(new Event('eburon_config_updated'));
           }
       } catch (err) {
-          console.warn("Supabase sync skipped or failed (using local):", err);
+          // Silent fail on fetch is acceptable as we fallback to local
+          console.warn("Supabase sync skipped or failed (using local)", err);
       } finally {
           setIsSyncing(false);
       }
@@ -88,8 +90,21 @@ const Settings: React.FC = () => {
           setIsSaved(true);
           setTimeout(() => setIsSaved(false), 3000);
       } catch (err: any) {
+          // Safely stringify error to avoid [object Object]
+          let errorMsg = "Unknown error";
+          if (typeof err === 'string') errorMsg = err;
+          else if (err?.message) errorMsg = err.message;
+          else if (err?.details) errorMsg = err.details;
+          else {
+              try {
+                  errorMsg = JSON.stringify(err);
+              } catch (e) {
+                  errorMsg = "Unserializable Error Object";
+              }
+          }
+
           console.error("Failed to save to Cloud DB:", err);
-          setSyncError("Saved locally, but Cloud sync failed.");
+          setSyncError(`Saved locally. Cloud sync error: ${errorMsg.substring(0, 50)}...`);
           // Still show saved state because local worked
           setIsSaved(true);
           setTimeout(() => setIsSaved(false), 3000);
@@ -101,6 +116,7 @@ const Settings: React.FC = () => {
   const voiceStyles = [
     "Dutch Flemish expressive",
     "Tagalog English Mix",
+    "Singaporean Singlish Casual",
     "Turkish Local Language",
     "Arabic Accent UAE National",
     "French Grown Native Speaking",

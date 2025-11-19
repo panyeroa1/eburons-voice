@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { 
@@ -6,6 +7,7 @@ import {
     TRAFFICKING_SYSTEM_CONTENT, 
     FLEMISH_EXPRESSIONS_CONTENT,
     TAGALOG_EXPRESSIONS_CONTENT,
+    SINGAPORE_EXPRESSIONS_CONTENT,
     TURKISH_EXPRESSIONS_CONTENT,
     ARABIC_EXPRESSIONS_CONTENT,
     FRENCH_EXPRESSIONS_CONTENT,
@@ -36,10 +38,16 @@ export const useLiveApi = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const outputAnalyserRef = useRef<AnalyserNode | null>(null);
   const nextStartTimeRef = useRef<number>(0);
   const sessionRef = useRef<any>(null);
   const [transcription, setTranscription] = useState<string>('');
   
+  // Sync Refs for Audio Loop
+  const isSpeakingRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
+  const micVolumeRef = useRef<number>(0);
+
   // Retry Logic Refs
   const isIntentionalDisconnectRef = useRef(false);
   const reconnectAttemptRef = useRef(0);
@@ -79,6 +87,42 @@ export const useLiveApi = () => {
       audioContextRef.current = audioCtx;
       inputAudioContextRef.current = inputCtx;
 
+      // Setup Output Analyser for Visualizer (Agent's Voice)
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.1;
+      outputAnalyserRef.current = analyser;
+
+      // Start Visualizer Loop
+      const updateVisualizer = () => {
+        let vol = 0;
+        
+        if (isSpeakingRef.current && outputAnalyserRef.current) {
+            // Agent is speaking: Use Output Analyser
+            const dataArray = new Uint8Array(outputAnalyserRef.current.frequencyBinCount);
+            outputAnalyserRef.current.getByteFrequencyData(dataArray);
+            
+            // Calculate average volume
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            const average = sum / dataArray.length;
+            // Normalize 0-255 to 0-1, boost slightly
+            vol = Math.min((average / 128) * 1.5, 1);
+        } else {
+            // Agent is silent: Use Mic Volume (from Ref to avoid race conditions)
+            vol = micVolumeRef.current;
+        }
+        
+        setStatus(s => ({...s, volume: vol}));
+        rafRef.current = requestAnimationFrame(updateVisualizer);
+      };
+      
+      // Start the loop
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(updateVisualizer);
+
       // Get Mic Stream
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -105,6 +149,8 @@ export const useLiveApi = () => {
           expressionContent = FLEMISH_EXPRESSIONS_CONTENT;
       } else if (voiceStyle.includes('Tagalog') || language.includes('Filipino') || language.includes('Tagalog')) {
           expressionContent = TAGALOG_EXPRESSIONS_CONTENT;
+      } else if (voiceStyle.includes('Singapore') || voiceStyle.includes('Singlish')) {
+          expressionContent = SINGAPORE_EXPRESSIONS_CONTENT;
       } else if (voiceStyle.includes('Turkish') || language.includes('Turkish')) {
           expressionContent = TURKISH_EXPRESSIONS_CONTENT;
       } else if (voiceStyle.includes('Arabic') || language.includes('Arabic')) {
@@ -136,7 +182,7 @@ export const useLiveApi = () => {
       systemInstruction += `\n\n*** VOICE IDENTITY & LANGUAGE PROTOCOL (CRITICAL) ***
       1. VOICE STYLE/ACCENT: You must strictly adopt a "${voiceStyle}" accent, tone, and persona. 
          - Even if speaking English, you must sound like a native speaker of that region speaking English.
-         - Use culturally relevant mannerisms or interjections if they fit the style (e.g., "Allee" for Flemish, "Lah" for Taglish, "Yani" for Arabic) but keep them subtle.
+         - Use culturally relevant mannerisms or interjections if they fit the style (e.g., "Allee" for Flemish, "Lah" for Taglish/Singlish, "Yani" for Arabic) but keep them subtle.
       2. OUTPUT LANGUAGE: You must speak in "${language}".
          - Example: If Style is "Dutch Flemish" and Language is "English", speak English with a heavy Flemish accent.
          - Example: If Style is "Turkish" and Language is "Turkish", speak natural Turkish.
@@ -152,10 +198,10 @@ export const useLiveApi = () => {
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Orus' } }, // Charon for authoritative tone
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Orus' } },
           },
           systemInstruction: { parts: [{ text: systemInstruction }] },
-          inputAudioTranscription: {}, // Enabled for stop/start logic - Removed invalid model param
+          inputAudioTranscription: {},
         },
         callbacks: {
           onopen: () => {
@@ -168,7 +214,6 @@ export const useLiveApi = () => {
                 error: undefined 
             }));
             
-            // Reset retry count on successful connection
             reconnectAttemptRef.current = 0;
             
             // Setup Input Processing
@@ -179,13 +224,16 @@ export const useLiveApi = () => {
             const processor = inputContext.createScriptProcessor(4096, 1, 1);
             
             processor.onaudioprocess = (e) => {
+              // Calculate Mic Volume
               const inputData = e.inputBuffer.getChannelData(0);
-              // Calculate volume for visualizer
               let sum = 0;
               for(let i=0; i<inputData.length; i++) sum += inputData[i] * inputData[i];
               const rms = Math.sqrt(sum / inputData.length);
-              setStatus(s => ({...s, volume: rms}));
+              
+              // Update ref for visualizer loop (boosted for visibility)
+              micVolumeRef.current = rms * 3; 
 
+              // Send Audio to Gemini
               const pcmBlob = createPcmBlob(inputData);
               sessionPromise.then(session => {
                 try {
@@ -198,10 +246,9 @@ export const useLiveApi = () => {
 
             source.connect(processor);
             
-            // NEW: Use a GainNode with 0 gain to prevent audio loopback (echo) 
-            // while keeping the ScriptProcessor active for input processing.
+            // Silence microphone loopback (Prevent Echo)
             const gainNode = inputContext.createGain();
-            gainNode.gain.value = 0;
+            gainNode.gain.value = 0; 
             processor.connect(gainNode);
             gainNode.connect(inputContext.destination);
             
@@ -213,6 +260,7 @@ export const useLiveApi = () => {
               const audioData = msg.serverContent.modelTurn.parts[0].inlineData.data;
               if (audioContextRef.current) {
                 setStatus(s => ({...s, isSpeaking: true}));
+                isSpeakingRef.current = true;
                 
                 const ctx = audioContextRef.current;
                 const audioBuffer = await decodeAudioData(
@@ -222,7 +270,14 @@ export const useLiveApi = () => {
 
                 const source = ctx.createBufferSource();
                 source.buffer = audioBuffer;
-                source.connect(ctx.destination);
+                
+                // Connect source to Analyser (for visualizer) and Destination (for speakers)
+                if (outputAnalyserRef.current) {
+                    source.connect(outputAnalyserRef.current);
+                    outputAnalyserRef.current.connect(ctx.destination);
+                } else {
+                    source.connect(ctx.destination);
+                }
                 
                 // Schedule playback
                 const currentTime = ctx.currentTime;
@@ -234,9 +289,10 @@ export const useLiveApi = () => {
                 nextStartTimeRef.current += audioBuffer.duration;
 
                 source.onended = () => {
-                    // Simple check if queue is empty to toggle talking state
+                    // Only clear speaking flag if no future chunks are scheduled close by
                     if (ctx.currentTime >= nextStartTimeRef.current - 0.1) {
                          setStatus(s => ({...s, isSpeaking: false}));
+                         isSpeakingRef.current = false;
                     }
                 };
               }
@@ -250,13 +306,13 @@ export const useLiveApi = () => {
             if (msg.serverContent?.interrupted) {
                 nextStartTimeRef.current = 0;
                 setStatus(s => ({...s, isSpeaking: false}));
+                isSpeakingRef.current = false;
             }
           },
           onclose: () => {
             setStatus(s => ({ ...s, isConnected: false, isConnecting: false, isListening: false }));
             sessionRef.current = null;
-            
-            // Attempt Reconnect if not intentional
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
             if (!isIntentionalDisconnectRef.current) {
                 attemptReconnect();
             }
@@ -266,12 +322,11 @@ export const useLiveApi = () => {
             setStatus(s => ({ ...s, isConnected: false, isConnecting: false, isListening: false }));
             sessionRef.current = null;
             
-            // Stop local streams on error
             if (sourceRef.current) sourceRef.current.disconnect();
             if (processorRef.current) processorRef.current.disconnect();
             if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
 
-            // Attempt Reconnect if not intentional
             if (!isIntentionalDisconnectRef.current) {
                 attemptReconnect();
             }
@@ -283,8 +338,8 @@ export const useLiveApi = () => {
       sessionPromise.catch(err => {
           console.error("Session failed to initialize", err);
           sessionRef.current = null;
+          if (rafRef.current) cancelAnimationFrame(rafRef.current);
           if (!isIntentionalDisconnectRef.current) {
-             // Very specific connection errors might be retryable
              attemptReconnect();
           } else {
              setStatus(s => ({ ...s, isConnected: false, isConnecting: false, error: "Connection Failed. " + (err.message || "") }));
@@ -295,6 +350,7 @@ export const useLiveApi = () => {
       console.error("Failed to connect", error);
       setStatus(s => ({ ...s, isConnecting: false, error: error.message }));
       sessionRef.current = null;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (!isIntentionalDisconnectRef.current) {
           attemptReconnect();
       }
@@ -309,7 +365,7 @@ export const useLiveApi = () => {
   const attemptReconnect = () => {
       if (reconnectAttemptRef.current < MAX_RETRIES) {
           reconnectAttemptRef.current += 1;
-          const delay = Math.min(1000 * (2 ** (reconnectAttemptRef.current - 1)), 5000); // Exponential backoff: 1s, 2s, 4s
+          const delay = Math.min(1000 * (2 ** (reconnectAttemptRef.current - 1)), 5000);
           
           console.log(`Attempting reconnect ${reconnectAttemptRef.current}/${MAX_RETRIES} in ${delay}ms`);
           
@@ -338,11 +394,14 @@ export const useLiveApi = () => {
     isIntentionalDisconnectRef.current = true;
     if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
     reconnectAttemptRef.current = 0;
+    
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    isSpeakingRef.current = false;
 
     if (sessionRef.current) {
       sessionRef.current.then((session: any) => {
           if(session.close) session.close();
-      }).catch(() => {}); // Ignore close errors
+      }).catch(() => {});
     }
     
     sessionRef.current = null;
@@ -367,7 +426,6 @@ export const useLiveApi = () => {
   const sendText = useCallback((text: string) => {
       if (sessionRef.current) {
           sessionRef.current.then((session: any) => {
-              // Safely check if send method exists before calling
               if (typeof session.send === 'function') {
                   try {
                       session.send({ 
